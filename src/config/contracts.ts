@@ -5,7 +5,7 @@ export const CHAIN_ID = 8453; // Base Mainnet
 
 // ─── CoinBin Protocol Settings ───────────────────────────────────────────────
 // ⚠️  استبدل هذا العنوان بعنوان محفظتك لاستقبال الرسوم
-export const FEE_RECIPIENT = "0xYourWalletAddressHere" as const;
+export const FEE_RECIPIENT = "0x296Bd27a4702f5cf0a5362452540eF7a1E4ce36D" as const;
 
 // رسوم البروتوكول: 30 = 0.30% من كل صفقة
 // مثال: مستخدم يبيع $1000 → تحصل على $3.00
