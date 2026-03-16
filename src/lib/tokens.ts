@@ -36,7 +36,7 @@ export const KNOWN_TOKENS: TokenInfo[] = [
     coingeckoId: "coinbase-wrapped-btc",
   },
   {
-    address: "0x532f3EFf7B64E9DbF6F16E21c96D8cd5a20e45E7",
+    address: "0x532F3Eff7B64E9DBF6f16E21C96d8Cd5a20E45e7",
     symbol: "BRETT",
     name: "Brett",
     decimals: 18,
@@ -56,7 +56,7 @@ export const KNOWN_TOKENS: TokenInfo[] = [
     coingeckoId: "degen-base",
   },
   {
-    address: "0xac1Bd2486aAf3B5C0fc3Fd868558b082a531B2B4",
+    address: "0xAC1Bd2486aAf3B5C0fc3Fd868558b082a531B2B4",
     symbol: "TOSHI",
     name: "Toshi",
     decimals: 18,
@@ -137,7 +137,7 @@ export const KNOWN_TOKENS: TokenInfo[] = [
     coingeckoId: "wrapped-steth",
   },
   {
-    address: "0x78a087d713Be963Bf307b18F2Ff8122EF9A09aa0",
+    address: "0x78A087d713BE963bf307B18f2ff8122Ef9A09AA0",
     symbol: "BSWAP",
     name: "BaseSwap Token",
     decimals: 18,
@@ -163,7 +163,7 @@ export const KNOWN_TOKENS: TokenInfo[] = [
     coingeckoId: "higher",
   },
   {
-    address: "0x22e290b3a54954a1f857acbd7e35f18e0b38f2B0",
+    address: "0x22E290b3A54954a1F857AcbD7E35F18e0b38F2B0",
     symbol: "MOCHI",
     name: "Mochi",
     decimals: 18,
@@ -188,7 +188,7 @@ export const KNOWN_TOKENS: TokenInfo[] = [
     logoLetter: "B",
   },
   {
-    address: "0xcfA3Ef56d303AE4fAabA0592388F19d7C3399FB4",
+    address: "0xCfA3Ef56d303AE4fAabA0592388F19d7C3399FB4",
     symbol: "EURC",
     name: "Euro Coin",
     decimals: 6,
@@ -200,8 +200,8 @@ export const KNOWN_TOKENS: TokenInfo[] = [
 
 // Tokens that should never be sold (they ARE the output or stablecoins we keep)
 export const UNSELLABLE = new Set([
-  "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", // USDC
-  "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca", // USDbC
+  "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913".toLowerCase(), // USDC
+  "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca".toLowerCase(), // USDbC
 ]);
 
 export function getTokenInfo(address: string): TokenInfo | undefined {
