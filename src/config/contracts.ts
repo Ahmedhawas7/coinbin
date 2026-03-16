@@ -164,7 +164,6 @@ export const MULTICALL3_ABI = [
         components: [
           { name: "target", type: "address" },
           { name: "allowFailure", type: "bool" },
-          { name: "value", type: "uint256" },
           { name: "callData", type: "bytes" },
         ],
       },

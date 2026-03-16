@@ -136,7 +136,6 @@ export function useTokenBalances() {
       const balanceCalls = tokenList.map((token) => ({
         target: token.address as Address,
         allowFailure: true,
-        value: 0n,
         callData: encodeFunctionData({
           abi: ERC20_ABI,
           functionName: "balanceOf",
