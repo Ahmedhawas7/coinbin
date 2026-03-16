@@ -359,6 +359,7 @@ export default function HomePage() {
                     <div className="p-8 text-center text-red-400 text-sm">
                       <div className="text-2xl mb-2">⚠️</div>
                       <div className="mb-3">خطأ في جلب الأرصدة</div>
+                      <div className="mb-3 text-xs opacity-70 break-words">{error}</div>
                       <button onClick={refetch} className="text-xs text-[#0052FF] hover:underline">
                         إعادة المحاولة
                       </button>

@@ -1,5 +1,5 @@
 // src/config/wagmi.ts
-import { http, createConfig } from "wagmi";
+import { http, createConfig, fallback } from "wagmi";
 import { base } from "wagmi/chains";
 import { coinbaseWallet, metaMask, walletConnect } from "wagmi/connectors";
 
@@ -17,9 +17,12 @@ export const wagmiConfig = createConfig({
     walletConnect({ projectId }),
   ],
   transports: {
-    [base.id]: http(
-      `https://api.developer.coinbase.com/rpc/v1/base/${process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}`
-    ),
+    [base.id]: fallback([
+      http(
+        `https://api.developer.coinbase.com/rpc/v1/base/${process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}`
+      ),
+      http("https://mainnet.base.org")
+    ]),
   },
   ssr: true,
 });
