@@ -204,6 +204,13 @@ export const UNSELLABLE = new Set([
   "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca".toLowerCase(), // USDbC
 ]);
 
+// Useful common addresses
+export const TOKENS = {
+  USDC: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+  WETH: "0x4200000000000000000000000000000000000006",
+  cbBTC: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+};
+
 export function getTokenInfo(address: string): TokenInfo | undefined {
   return KNOWN_TOKENS.find(
     (t) => t.address.toLowerCase() === address.toLowerCase()

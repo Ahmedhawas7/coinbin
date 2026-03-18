@@ -11,7 +11,7 @@ export const wagmiConfig = createConfig({
     coinbaseWallet({
       appName: "CoinBin",
       appLogoUrl: "https://base.org/favicon.ico",
-      preference: "eoaOnly",
+      preference: "all",
     }),
     metaMask(),
     walletConnect({ projectId }),
