@@ -24,54 +24,65 @@ export function StatsBar({
   );
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
       {/* Total Portfolio */}
-      <div className="col-span-2 sm:col-span-1 bg-[#0E1015] border border-[#1E2028] rounded-2xl p-4 flex flex-col gap-1">
-        <div className="text-[10px] text-gray-600 uppercase tracking-widest">إجمالي المحفظة</div>
+      <div className="col-span-2 lg:col-span-1 glass-card rounded-2xl p-6 flex flex-col gap-2 group relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-24 h-24 bg-base-blue/5 rounded-full -mr-8 -mt-8 blur-2xl group-hover:bg-base-blue/10 transition-colors" />
+        <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">إجمالي المحفظة</div>
         {loading ? <Skeleton /> : (
-          <div className="text-xl font-bold text-white">
+          <div className="text-2xl font-black text-white tracking-tight">
             ${totalValue >= 1 ? totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 }) : totalValue.toFixed(4)}
           </div>
         )}
       </div>
 
       {/* Token count */}
-      <div className="bg-[#0E1015] border border-[#1E2028] rounded-2xl p-4 flex flex-col gap-1">
-        <div className="text-[10px] text-gray-600 uppercase tracking-widest">الرموز</div>
+      <div className="glass-card rounded-2xl p-6 flex flex-col gap-2 group relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full -mr-8 -mt-8 blur-2xl group-hover:bg-purple-500/10 transition-colors" />
+        <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">الرموز بالرصيد</div>
         {loading ? <Skeleton /> : (
-          <div className="text-xl font-bold text-white">{tokenCount}</div>
+          <div className="text-2xl font-black text-white tracking-tight">{tokenCount}</div>
         )}
         {dustCount > 0 && !loading && (
-          <div className="text-[10px] text-amber-500/70">{dustCount} غبار</div>
+          <div className="text-xs font-semibold text-amber-500/80 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            {dustCount} غبار مكتشف
+          </div>
         )}
       </div>
 
       {/* Dead tokens */}
-      <div className="bg-[#0E1015] border border-[#1E2028] rounded-2xl p-4 flex flex-col gap-1">
-        <div className="text-[10px] text-gray-600 uppercase tracking-widest">بلا سيولة</div>
+      <div className="glass-card rounded-2xl p-6 flex flex-col gap-2 group relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full -mr-8 -mt-8 blur-2xl group-hover:bg-orange-500/10 transition-colors" />
+        <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">بدون سيولة</div>
         {loading ? <Skeleton /> : (
-          <div className={`text-xl font-bold ${deadCount > 0 ? "text-orange-400" : "text-emerald-500"}`}>
+          <div className={`text-2xl font-black tracking-tight ${deadCount > 0 ? "text-orange-500" : "text-emerald-500"}`}>
             {deadCount}
           </div>
         )}
         {deadCount > 0 && !loading && (
-          <div className="text-[10px] text-orange-500/60">قابلة للحرق 🔥</div>
+          <div className="text-xs font-semibold text-orange-500/80 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 status-pulse" />
+            جاهزة للحرق 🔥
+          </div>
         )}
       </div>
 
       {/* Selected */}
-      <div className={`bg-[#0E1015] border rounded-2xl p-4 flex flex-col gap-1 transition-colors ${
-        selectedCount > 0 ? "border-[#0052FF]/30 bg-[#0052FF]/3" : "border-[#1E2028]"
+      <div className={`glass-card rounded-2xl p-6 flex flex-col gap-2 group relative overflow-hidden transition-all duration-500 ${
+        selectedCount > 0 ? "border-base-blue/40 bg-base-blue/[0.03] glow-accent scale-[1.02]" : ""
       }`}>
-        <div className="text-[10px] text-gray-600 uppercase tracking-widest">محدد</div>
+        <div className="absolute top-0 right-0 w-24 h-24 bg-base-blue/10 rounded-full -mr-8 -mt-8 blur-2xl opacity-50" />
+        <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">المحدد للبيع</div>
         {loading ? <Skeleton /> : (
-          <div className={`text-xl font-bold ${selectedCount > 0 ? "text-[#0052FF]" : "text-white"}`}>
+          <div className={`text-2xl font-black tracking-tight ${selectedCount > 0 ? "text-base-blue" : "text-white"}`}>
             {selectedCount}
           </div>
         )}
         {selectedValue > 0 && !loading && (
-          <div className="text-[10px] text-[#0052FF]/70">
-            ~${selectedValue.toFixed(2)}
+          <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            قيمة البيع: ~${selectedValue.toFixed(2)}
           </div>
         )}
       </div>

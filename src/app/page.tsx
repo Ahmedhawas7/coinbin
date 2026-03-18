@@ -192,40 +192,43 @@ export default function HomePage() {
 
   // ─── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#070809]">
+    <div className="min-h-screen bg-bg-primary text-white selection:bg-base-blue/30 selection:text-white">
+      <div className="mesh-gradient" />
 
       {/* ─── Header ─────────────────────────────────────────────────────── */}
-      <header className="border-b border-[#1E2028] bg-[#070809]/90 backdrop-blur-md sticky top-0 z-20">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+      <header className="border-b border-white/5 bg-black/40 backdrop-blur-xl sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
           {/* Brand */}
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#0052FF] flex items-center justify-center shadow-lg shadow-blue-900/30">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <div className="flex items-center gap-4 group cursor-pointer">
+            <div className="w-11 h-11 rounded-2xl bg-base-blue flex items-center justify-center shadow-[0_0_20px_rgba(0,82,255,0.3)] group-hover:scale-110 transition-transform duration-500">
+              <svg width="22" height="22" viewBox="0 0 18 18" fill="none">
                 <circle cx="9" cy="9" r="8" fill="white" opacity="0.15" />
                 <path d="M9 2C5.134 2 2 5.134 2 9C2 12.866 5.134 16 9 16C12.866 16 16 12.866 16 9C16 5.134 12.866 2 9 2ZM9 14C6.243 14 4 11.757 4 9C4 6.243 6.243 4 9 4C11.757 4 14 6.243 14 9C14 11.757 11.757 14 9 14Z" fill="white" />
                 <circle cx="9" cy="9" r="2.5" fill="white" />
               </svg>
             </div>
-            <div>
-              <div className="text-sm font-bold text-white leading-none">CoinBin 🗑️</div>
-              <div className="text-[10px] text-gray-600 mt-0.5">نظّف محفظتك — ابدأ من جديد</div>
+            <div className="hidden sm:block">
+              <div className="text-xl font-black tracking-tighter text-white leading-none">CoinBin <span className="text-base-blue">🗑️</span></div>
+              <div className="text-[11px] font-bold text-slate-500 mt-1 uppercase tracking-widest">Base Cleaner</div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0052FF]/5 border border-[#0052FF]/10">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#0052FF] animate-pulse" />
-              <span className="text-[11px] text-[#0052FF]">Base Mainnet</span>
+          <div className="flex items-center gap-4">
+            <div className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-500/5 border border-emerald-500/10">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 status-pulse" />
+              <span className="text-[11px] font-black text-emerald-400 uppercase tracking-widest">Base Network</span>
             </div>
             <Link
               href="/dashboard"
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#1E2028] text-[11px] text-gray-500 hover:text-gray-300 hover:border-[#2E3038] transition-all"
+              className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl border border-white/5 bg-white/[0.02] text-[11px] font-bold text-slate-400 hover:text-white hover:border-white/10 hover:bg-white/[0.05] transition-all"
             >
-              📊 لوحة المالك
+              📊 DASHBOARD
             </Link>
 
+            <div className="h-8 w-[1px] bg-white/5 mx-2" />
+
             <Wallet>
-              <ConnectWallet className="!bg-[#0052FF] !text-white !rounded-xl !text-sm !px-4 !py-2 hover:!bg-[#0041CC] transition-colors font-medium">
+              <ConnectWallet className="!bg-base-blue !text-white !rounded-2xl !text-sm !px-6 !py-2.5 hover:!bg-[#0041CC] transition-all font-black uppercase tracking-widest shadow-[0_0_20px_rgba(0,82,255,0.2)]">
                 <Avatar className="h-6 w-6" />
                 <Name />
               </ConnectWallet>
@@ -233,10 +236,10 @@ export default function HomePage() {
                 <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
                   <Avatar />
                   <Name />
-                  <Address />
+                  <Address className="text-slate-400" />
                   <EthBalance />
                 </Identity>
-                <WalletDropdownDisconnect />
+                <WalletDropdownDisconnect className="text-red-400 hover:bg-red-500/10" />
               </WalletDropdown>
             </Wallet>
           </div>
@@ -244,65 +247,59 @@ export default function HomePage() {
       </header>
 
       {/* ─── Main Content ────────────────────────────────────────────────── */}
-      <main className="max-w-5xl mx-auto px-4 py-8">
+      <main className="max-w-6xl mx-auto px-6 py-12">
         {!isConnected ? (
-          /* ─── Landing / Not Connected ────────────────────────────────── */
-          <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in-up">
+          /* ─── Hero / Not Connected ────────────────────────────────── */
+          <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in-up">
 
-            {/* Hero */}
-            <div className="w-24 h-24 rounded-3xl bg-[#0052FF]/10 border border-[#0052FF]/20 flex items-center justify-center mb-8 glow-blue">
-              <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
-                <rect x="6" y="12" width="32" height="22" rx="4" stroke="#0052FF" strokeWidth="2.5" />
-                <path d="M6 18h32" stroke="#0052FF" strokeWidth="2.5" />
-                <circle cx="30" cy="26" r="2.5" fill="#0052FF" />
-                <circle cx="24" cy="26" r="2.5" fill="#0052FF" opacity="0.5" />
-              </svg>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-base-blue/5 border border-base-blue/10 text-[11px] font-black text-base-blue uppercase tracking-[0.2em] mb-8">
+              ✨ THE #1 BASE SWEEPER
             </div>
 
-            <h1 className="text-4xl font-bold text-white mb-3 leading-tight">
-              نظّف محفظتك 🗑️<br />
-              <span className="text-[#0052FF]">واستقبل USDC</span>
+            <h1 className="text-6xl md:text-7xl font-black text-white mb-6 leading-[0.9] tracking-tighter">
+              نظّف محفظتك <br />
+              <span className="text-gradient">واستلم USDC</span>
             </h1>
-            <p className="text-gray-500 text-base mb-10 max-w-md leading-relaxed">
-              اكتشف جميع توكناتك على Base، بيع كل شيء دفعة واحدة، واحرق التوكنات الميتة.<br />
-              <span className="text-gray-400">بضغطة واحدة.</span>
+            
+            <p className="text-slate-500 text-lg mb-12 max-w-xl leading-relaxed font-medium">
+              اكتشف جميع توكناتك على شبكة Base بضغطة واحدة. بيع العملات دفعة واحدة بأفضل الأسعار المباشرة، أو احرق العملات الميتة لتنظيف محفظتك تماماً.
             </p>
 
-            {/* Features */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 w-full max-w-lg">
+            <div className="flex flex-col sm:flex-row items-center gap-4 mb-16">
+              <Wallet>
+                <ConnectWallet className="!bg-base-blue !text-white !rounded-2xl !text-lg !px-12 !py-6 hover:!bg-[#0041CC] transition-all font-black uppercase tracking-widest shadow-[0_0_40px_rgba(0,82,255,0.35)] active:scale-95">
+                  <span>ربط المحفظة للبدء</span>
+                </ConnectWallet>
+              </Wallet>
+              <Link href="https://docs.base.org" target="_blank" className="px-10 py-5 rounded-2xl bg-white/[0.03] border border-white/5 font-black text-sm text-slate-400 hover:text-white hover:bg-white/[0.07] transition-all uppercase tracking-widest">
+                كيف يعمل؟
+              </Link>
+            </div>
+
+            {/* Features Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-3xl">
               {[
-                { icon: "🔍", title: "اكتشاف تلقائي", desc: "جميع توكناتك على Base" },
-                { icon: "💰", title: "بيع دفعة واحدة", desc: "عبر Uniswap V3 بأفضل سعر" },
-                { icon: "🔥", title: "حرق الميت", desc: "تنظيف كامل بضغطة واحدة" },
+                { icon: "⚡", title: "اكتشاف فوري", desc: "فحص شامل لمحفظتك بحثاً عن أي عملات" },
+                { icon: "💎", title: "أسعار حقيقية", desc: "ربط مباشر مع GeckoTerminal وUniswap" },
+                { icon: "🔒", title: "آمن وشفاف", desc: "تحكم كامل في موافقات العملات قبل البيع" },
               ].map((f, i) => (
-                <div key={i} className="bg-[#0E1015] border border-[#1E2028] rounded-2xl p-4 text-center hover:border-[#0052FF]/20 transition-colors">
-                  <div className="text-2xl mb-2">{f.icon}</div>
-                  <div className="text-sm font-semibold text-white mb-1">{f.title}</div>
-                  <div className="text-[11px] text-gray-600">{f.desc}</div>
+                <div key={i} className="glass-card rounded-3xl p-8 text-center group">
+                  <div className="text-4xl mb-4 group-hover:scale-125 transition-transform duration-500">{f.icon}</div>
+                  <div className="text-sm font-black text-white mb-2 uppercase tracking-wide">{f.title}</div>
+                  <div className="text-xs font-medium text-slate-500 leading-relaxed">{f.desc}</div>
                 </div>
               ))}
             </div>
-
-            {/* Referral teaser */}
-            <div className="mb-8 px-4 py-3 rounded-xl border border-amber-900/30 bg-amber-950/20 text-sm text-amber-400/80">
-              🔗 اربح <strong>20%</strong> من رسوم كل صديق تدعوه — تلقائياً وإلى الأبد
-            </div>
-
-            <Wallet>
-              <ConnectWallet className="!bg-[#0052FF] !text-white !rounded-2xl !text-base !px-10 !py-4 hover:!bg-[#0041CC] transition-colors font-semibold shadow-xl shadow-blue-900/30">
-                <span>ربط المحفظة والبدء</span>
-              </ConnectWallet>
-            </Wallet>
-
-            <div className="mt-6 flex items-center gap-6 text-[11px] text-gray-700">
-              <span className="flex items-center gap-1.5"><span className="text-emerald-600">✓</span> Coinbase Wallet</span>
-              <span className="flex items-center gap-1.5"><span className="text-emerald-600">✓</span> MetaMask</span>
-              <span className="flex items-center gap-1.5"><span className="text-emerald-600">✓</span> WalletConnect</span>
+            
+            <div className="mt-16 pt-8 border-t border-white/5 w-full max-w-lg flex items-center justify-around opacity-40">
+              <img src="https://avatars.githubusercontent.com/u/108554348?v=4" className="h-6 grayscale hover:grayscale-0 transition-all" alt="Base" title="Built on Base" />
+              <img src="https://uniswap.org/favicon.png" className="h-6 grayscale hover:grayscale-0 transition-all" alt="Uniswap" title="Powered by Uniswap" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Verified Contracts</span>
             </div>
           </div>
         ) : (
-          /* ─── Connected: Dashboard ───────────────────────────────────── */
-          <>
+          /* ─── Dashboard ───────────────────────────────────── */
+          <div className="animate-fade-in">
             <StatsBar
               totalValue={totalUSDValue}
               tokenCount={tokens.filter((t) => t.canSell).length}
@@ -313,118 +310,139 @@ export default function HomePage() {
               loading={loading}
             />
 
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-10">
               {/* ─── Token List ─────────────────────────────────────────── */}
-              <div>
-                {/* Controls */}
-                <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
-                  <div className="flex items-center gap-2 flex-wrap">
+              <div className="min-w-0">
+                {/* Search and Filters Header */}
+                <div className="glass-card rounded-3xl p-4 mb-6 flex flex-col md:flex-row gap-4 items-center justify-between border-white/[0.03]">
+                  <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto no-scrollbar pb-2 md:pb-0">
                     <button
                       onClick={toggleAll}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-[#1E2028] text-gray-400 hover:border-[#2E3038] hover:text-gray-200 transition-all"
+                      className={`text-[11px] font-black px-4 py-2.5 rounded-xl border transition-all whitespace-nowrap uppercase tracking-widest ${
+                        allSellableSelected ? "bg-red-500/10 border-red-500/20 text-red-400" : "bg-white/[0.03] border-white/5 text-slate-400 hover:text-white hover:border-white/10"
+                      }`}
                     >
-                      {allSellableSelected ? "إلغاء الكل" : "تحديد الكل"}
+                      {allSellableSelected ? "إلغاء التحديد" : "تحديد الكل"}
                     </button>
-                    <button
-                      onClick={selectDustOnly}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-[#1E2028] text-amber-500/70 hover:border-amber-500/30 hover:text-amber-400 transition-all"
-                    >
-                      الغبار ({dustTokens.length})
-                    </button>
-                    {(["all", "nonzero", "high", "dead"] as FilterType[]).map((f) => (
+                    <div className="w-[1px] h-6 bg-white/5 mx-1" />
+                    {(["all", "dust", "nonzero", "dead"] as FilterType[]).map((f) => (
                       <button
                         key={f}
                         onClick={() => setFilter(f)}
-                        className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
+                        className={`text-[11px] font-black px-4 py-2.5 rounded-xl border transition-all whitespace-nowrap uppercase tracking-widest ${
                           filter === f
-                            ? "bg-[#0052FF]/10 border-[#0052FF]/30 text-[#0052FF]"
-                            : "border-[#1E2028] text-gray-500 hover:border-[#2E3038]"
+                            ? "bg-base-blue/10 border-base-blue/20 text-base-blue glow-accent"
+                            : "bg-white/[0.03] border-white/5 text-slate-500 hover:text-slate-300"
                         }`}
                       >
-                        {f === "all" ? "الكل" : f === "nonzero" ? "غير صفري" : f === "high" ? "قيمة عالية" : `ميت 🔥 (${deadTokens.length})`}
+                        {f === "all" ? "الكل" : f === "dust" ? `غبار (${dustTokens.length})` : f === "nonzero" ? "أرصدة" : `ميت 🔥 (${deadTokens.length})`}
                       </button>
                     ))}
                   </div>
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="بحث..."
-                    className="text-xs px-3 py-1.5 rounded-lg border border-[#1E2028] bg-transparent text-gray-300 placeholder:text-gray-600 focus:outline-none focus:border-[#0052FF]/30 w-28 transition-colors"
-                  />
+                  
+                  <div className="relative w-full md:w-64 group">
+                    <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-600 group-focus-within:text-base-blue transition-colors">
+                      <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    </div>
+                    <input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="بحث عن رمز..."
+                      className="w-full text-xs font-bold py-3 pr-10 pl-4 rounded-xl glass-card border-white/5 bg-transparent focus:outline-none focus:border-base-blue/30 transition-all placeholder:text-slate-700"
+                    />
+                  </div>
                 </div>
 
-                {/* Table */}
-                <div className="rounded-2xl border border-[#1E2028] overflow-hidden">
+                {/* Table Container */}
+                <div className="glass rounded-[2rem] border border-white/10 overflow-hidden glow-accent/5">
                   {error ? (
-                    <div className="p-8 text-center text-red-400 text-sm">
-                      <div className="text-2xl mb-2">⚠️</div>
-                      <div className="mb-3">خطأ في جلب الأرصدة</div>
-                      <div className="mb-3 text-xs opacity-70 break-words">{error}</div>
-                      <button onClick={refetch} className="text-xs text-[#0052FF] hover:underline">
+                    <div className="p-16 text-center space-y-4">
+                      <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto text-2xl border border-red-500/20">⚠️</div>
+                      <div className="space-y-1">
+                        <div className="text-sm font-black text-white uppercase tracking-wider">خطأ في مزامنة البيانات</div>
+                        <div className="text-xs text-slate-500 max-w-xs mx-auto break-words">{error}</div>
+                      </div>
+                      <button onClick={refetch} className="px-6 py-2.5 rounded-xl bg-base-blue/10 text-base-blue font-black text-[11px] uppercase tracking-widest hover:bg-base-blue/20 transition-all">
                         إعادة المحاولة
                       </button>
                     </div>
                   ) : loading ? (
-                    <div className="p-10 text-center">
-                      <div className="inline-block w-8 h-8 border-2 border-[#1E2028] border-t-[#0052FF] rounded-full animate-spin mb-4" />
-                      <div className="text-sm text-gray-600">جارٍ تحميل الأرصدة...</div>
-                      <div className="text-[11px] text-gray-700 mt-1">يتم فحص جميع توكناتك على Base</div>
+                    <div className="p-20 text-center space-y-6">
+                      <div className="relative w-16 h-16 mx-auto">
+                        <div className="absolute inset-0 border-4 border-white/5 rounded-full" />
+                        <div className="absolute inset-0 border-4 border-base-blue rounded-full border-t-transparent animate-spin" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-sm font-black text-white uppercase tracking-widest animate-pulse">Scanning Base...</div>
+                        <div className="text-[11px] font-bold text-slate-600">نقوم بفحص جميع محافظ الهوية والتوكنات الخاصة بك</div>
+                      </div>
                     </div>
                   ) : (
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-[#1E2028] bg-[#0A0B0D]">
-                          <th className="w-10 pl-4 py-2.5" />
-                          <th className="text-[10px] text-gray-600 font-normal text-right uppercase tracking-widest py-2.5 pr-3">الرمز</th>
-                          <th className="text-[10px] text-gray-600 font-normal text-right uppercase tracking-widest py-2.5">الرصيد</th>
-                          <th className="text-[10px] text-gray-600 font-normal text-right uppercase tracking-widest py-2.5">السعر</th>
-                          <th className="text-[10px] text-gray-600 font-normal uppercase tracking-widest py-2.5 text-right pr-4">القيمة</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredTokens.length === 0 ? (
-                          <tr>
-                            <td colSpan={5} className="text-center text-sm text-gray-600 py-12">
-                              <div className="text-3xl mb-2 opacity-30">🔍</div>
-                              لا توجد رموز مطابقة
-                            </td>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="border-b border-white/5 bg-white/[0.01]">
+                            <th className="w-12 pl-6 py-4" />
+                            <th className="text-[10px] font-black text-slate-500 text-right uppercase tracking-[0.2em] py-4 pr-3">الرمز</th>
+                            <th className="text-[10px] font-black text-slate-500 text-right uppercase tracking-[0.2em] py-4">الرصيد</th>
+                            <th className="text-[10px] font-black text-slate-500 text-right uppercase tracking-[0.2em] py-4">السعر المباشر</th>
+                            <th className="text-[10px] font-black text-slate-500 text-right uppercase tracking-[0.2em] py-4 pr-6">القيمة التقريبية</th>
                           </tr>
-                        ) : (
-                          filteredTokens.map((token) => (
-                            <TokenRow
-                              key={token.address}
-                              token={token}
-                              selected={selected.has(token.address)}
-                              onToggle={() => toggleToken(token.address)}
-                            />
-                          ))
-                        )}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-white/[0.02]">
+                          {filteredTokens.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="py-24 text-center opacity-40">
+                                <div className="text-5xl mb-4">🔍</div>
+                                <div className="text-xs font-black uppercase tracking-widest">لا توجد نتائج</div>
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredTokens.map((token) => (
+                              <TokenRow
+                                key={token.address}
+                                token={token}
+                                selected={selected.has(token.address)}
+                                onToggle={() => toggleToken(token.address)}
+                              />
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                 </div>
 
-                {/* Refresh */}
-                <div className="mt-3 flex items-center justify-between">
-                  <div className="text-[11px] text-gray-700">
-                    {tokens.length > 0 && `${tokens.length} رمز مكتشف`}
+                {/* Footer Stats/Actions */}
+                <div className="mt-6 flex items-center justify-between px-2">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1.5 opacity-60">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{tokens.length} عملة مكتشفة</span>
+                    </div>
+                    {selected.size > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-base-blue animate-pulse" />
+                        <span className="text-[10px] font-black text-base-blue uppercase tracking-widest">{selected.size} محدد</span>
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={refetch}
                     disabled={loading}
-                    className="text-xs text-gray-600 hover:text-gray-400 flex items-center gap-1.5 transition-colors"
+                    className="flex items-center gap-2 group text-[10px] font-black text-slate-500 hover:text-white uppercase tracking-widest transition-colors"
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg className={`group-hover:rotate-180 transition-transform duration-500 ${loading ? 'animate-spin' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                       <path d="M23 4v6h-6" /><path d="M1 20v-6h6" />
                       <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
                     </svg>
-                    تحديث الأرصدة
+                    تحديث القائمة
                   </button>
                 </div>
               </div>
 
-              {/* ─── Side Panel ─────────────────────────────────────────── */}
-              <div className="lg:sticky lg:top-24 lg:self-start space-y-4">
+              {/* ─── Sidebar ─────────────────────────────────────────── */}
+              <aside className="space-y-6">
                 <SweepPanel
                   selectedTokens={selectedTokens}
                   slippageBps={slippageBps}
@@ -435,20 +453,49 @@ export default function HomePage() {
                   isConnected={isConnected}
                   onAutoClassify={handleAutoClassify}
                 />
+                
                 <ReferralCard />
-              </div>
+
+                <div className="glass-card rounded-3xl p-6 border-white/[0.03]">
+                  <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-4">💡 تعليمات سريعة</h4>
+                  <ul className="space-y-3">
+                    {[
+                      "اختر العملات التي تريد بيعها من القائمة",
+                      "سيتم فحص السيولة تلقائياً لكل عملة",
+                      "تأكد من الموافقة على كل عملة في محفظتك",
+                      "العملات بدون سيولة ستوجّه تلقائياً للحرق"
+                    ].map((step, i) => (
+                      <li key={i} className="flex gap-3 text-[11px] font-bold text-slate-500 leading-tight">
+                        <span className="text-base-blue opacity-50">{i+1}.</span>
+                        {step}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </aside>
             </div>
-          </>
+          </div>
         )}
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-[#1E2028] mt-16 py-6 text-center text-xs text-gray-700">
-        <span>CoinBin 🗑️ · مبني على </span>
-        <a href="https://base.org" target="_blank" rel="noopener noreferrer" className="text-[#0052FF] hover:underline">Base</a>
-        <span> و </span>
-        <a href="https://uniswap.org" target="_blank" rel="noopener noreferrer" className="text-[#FF007A] hover:underline">Uniswap V3</a>
-        <span> · استخدم بمسؤولية — العملات الرقمية استثمار عالي المخاطر</span>
+      <footer className="border-t border-white/5 bg-black/40 backdrop-blur-xl py-12">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+             <div className="text-sm font-black text-white uppercase tracking-tighter">CoinBin <span className="text-base-blue">🗑️</span></div>
+             <div className="w-[1px] h-4 bg-white/10" />
+             <div className="text-[10px] font-bold text-slate-600">The first multi-token sweeper for Base</div>
+          </div>
+          
+          <div className="flex items-center gap-8 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+            <a href="https://base.org" className="hover:text-base-blue transition-colors">Base Ecosystem</a>
+            <a href="https://uniswap.org" className="hover:text-[#FF007A] transition-colors">Uniswap V3</a>
+          </div>
+          
+          <div className="text-[9px] font-bold text-slate-700 max-w-[200px] text-center md:text-left leading-relaxed">
+            استخدم بمسؤولية. لا نقوم بتخزين أي مفاتيح خاصة. جميع المعاملات تتم عبر عقود ذكية مفتوحة المصدر.
+          </div>
+        </div>
       </footer>
 
       {/* ─── Post-Sweep Modal ────────────────────────────────────────────── */}

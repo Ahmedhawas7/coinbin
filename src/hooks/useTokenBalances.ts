@@ -108,28 +108,31 @@ export function useTokenBalances() {
       // ─── 1. Try Alchemy for full discovery ──────────────────────────────
       if (ALCHEMY_KEY) {
         const alchemyTokens = await fetchAlchemyTokens(address);
-
-        // Merge: add discovered tokens not in KNOWN_TOKENS
-        for (const at of alchemyTokens) {
+        
+        // Filter out tokens already in KNOWN_TOKENS
+        const unknownAt = alchemyTokens.filter(at => {
           const addr = at.contractAddress.toLowerCase();
-          const known = KNOWN_TOKENS.find(
-            (k) => k.address.toLowerCase() === addr
-          );
-          if (!known) {
-            // fetch metadata
-            const meta = await fetchTokenMeta(at.contractAddress);
-            if (meta) {
-              tokenList.push({
-                address: at.contractAddress as `0x${string}`,
-                symbol: meta.symbol,
-                name: meta.name,
-                decimals: meta.decimals,
-                logoColor: addressToColor(at.contractAddress),
-                logoLetter: meta.symbol[0]?.toUpperCase() ?? "?",
-              } as TokenInfo & { isUnknown: true });
-            }
+          return !KNOWN_TOKENS.some(k => k.address.toLowerCase() === addr);
+        });
+
+        // Fetch metadata in parallel (limited batch if needed, but for now all at once)
+        const metaResults = await Promise.all(
+          unknownAt.map(at => fetchTokenMeta(at.contractAddress))
+        );
+
+        metaResults.forEach((meta, idx) => {
+          if (meta) {
+            const at = unknownAt[idx];
+            tokenList.push({
+              address: at.contractAddress as `0x${string}`,
+              symbol: meta.symbol,
+              name: meta.name,
+              decimals: meta.decimals,
+              logoColor: addressToColor(at.contractAddress),
+              logoLetter: meta.symbol[0]?.toUpperCase() ?? "?",
+            } as TokenInfo & { isUnknown: true });
           }
-        }
+        });
       }
 
       // ─── 2. Fetch all balances via Multicall3 ────────────────────────────
@@ -150,22 +153,49 @@ export function useTokenBalances() {
         args: [balanceCalls],
       });
 
-      // ─── 3. Fetch USD prices from CoinGecko (free tier) ─────────────────
-      const coingeckoIds = tokenList
-        .filter((t) => t.coingeckoId)
-        .map((t) => t.coingeckoId!)
-        .join(",");
+      // ─── 3. Fetch USD prices from GeckoTerminal (Best for Base Tokens) ──
+      const tokenAddresses = tokenList.map((t) => t.address.toLowerCase()).join(",");
 
-      let prices: Record<string, { usd: number }> = {};
-      if (coingeckoIds) {
+      let prices: Record<string, { price: number }> = {};
+      
+      // a) Try GeckoTerminal first
+      if (tokenAddresses) {
         try {
           const priceRes = await fetch(
-            `https://api.coingecko.com/api/v3/simple/price?ids=${coingeckoIds}&vs_currencies=usd`,
-            { next: { revalidate: 60 } }
+            `https://api.geckoterminal.com/api/v2/networks/base/tokens/multi/${tokenAddresses}`
           );
-          if (priceRes.ok) prices = await priceRes.json();
-        } catch {
-          // CoinGecko unavailable — prices default to 0
+          if (priceRes.ok) {
+            const data = await priceRes.json();
+            (data.data || []).forEach((item: any) => {
+              const addr = item.attributes.address.toLowerCase();
+              prices[addr] = {
+                price: parseFloat(item.attributes.price_usd || "0"),
+              };
+            });
+          }
+        } catch (err) {
+          console.error("GeckoTerminal fetch failed:", err);
+        }
+      }
+
+      // b) Fallback to LlamaPrice for missing prices
+      const missingAddresses = tokenList
+        .filter(t => !prices[t.address.toLowerCase()] || prices[t.address.toLowerCase()].price === 0)
+        .map(t => `base:${t.address.toLowerCase()}`)
+        .join(",");
+
+      if (missingAddresses) {
+        try {
+          const llamaRes = await fetch(`https://coins.llama.fi/prices/current/${missingAddresses}`);
+          if (llamaRes.ok) {
+            const llamaData = await llamaRes.json();
+            Object.entries(llamaData.coins || {}).forEach(([key, val]: [string, any]) => {
+              const addr = key.split(":")[1].toLowerCase();
+              prices[addr] = { price: val.price || 0 };
+            });
+          }
+        } catch (err) {
+          console.error("LlamaPrice fallback failed:", err);
         }
       }
 
@@ -193,9 +223,9 @@ export function useTokenBalances() {
         if (balance === 0n) return; // skip zero balance
 
         const balanceFormatted = Number(balance) / Math.pow(10, token.decimals);
-        const usdPrice = token.coingeckoId
-          ? prices[token.coingeckoId]?.usd ?? 0
-          : 0;
+        
+        // Get price from GeckoTerminal map
+        const usdPrice = prices[token.address.toLowerCase()]?.price || 0;
         const usdValue = balanceFormatted * usdPrice;
 
         tokenBalances.push({

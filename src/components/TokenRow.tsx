@@ -10,100 +10,99 @@ interface TokenRowProps {
 }
 
 export function TokenRow({ token, selected, onToggle, isLive }: TokenRowProps) {
+  const isUsdc = token.symbol === "USDC" || token.symbol === "USDbC";
   const hasValue = token.usdValue > 0;
-  const isDead = token.balance > 0n && token.usdValue === 0;
+  // Only show as possibly dead if it has NO value from Gecko AND it's not a stablecoin we already know.
+  const isPossiblyDead = token.balance > 0n && token.usdValue === 0 && !isUsdc;
 
   return (
     <tr
-      onClick={token.canSell ? onToggle : undefined}
-      className={`border-b border-[#1E2028]/60 transition-colors last:border-0 ${
-        token.canSell
-          ? selected
-            ? "bg-[#0052FF]/5 hover:bg-[#0052FF]/8 cursor-pointer"
-            : "hover:bg-[#0A0B0D] cursor-pointer"
-          : "opacity-40"
+      onClick={onToggle}
+      className={`border-b border-white/[0.04] transition-all duration-300 row-hover group last:border-0 ${
+        selected
+          ? "bg-base-blue/10 hover:bg-base-blue/15"
+          : "hover:bg-white/[0.02]"
       }`}
     >
       {/* Checkbox */}
-      <td className="w-10 pl-4 py-3">
-        {token.canSell && (
-          <div
-            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
-              selected
-                ? "bg-[#0052FF] border-[#0052FF]"
-                : "border-[#2E3038] hover:border-[#0052FF]/40"
-            }`}
-          >
+      <td className="w-12 pl-5 py-4">
+        <div
+          className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-300 ${
+            selected
+              ? "bg-base-blue border-base-blue shadow-[0_0_15px_rgba(0,82,255,0.4)]"
+              : "border-white/10 group-hover:border-base-blue/40"
+          }`}
+        >
             {selected && (
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                 <path
-                  d="M1 4l2 2 4-4"
+                  d="M2 5l2 2 4-4"
                   stroke="white"
-                  strokeWidth="1.5"
+                  strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
               </svg>
             )}
           </div>
-        )}
       </td>
 
       {/* Token info */}
-      <td className="py-3 pr-3">
-        <div className="flex items-center gap-2.5">
+      <td className="py-4 pr-3">
+        <div className="flex items-center gap-3">
           {/* Avatar */}
           <div className="relative flex-shrink-0">
-            {token.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={token.logoUrl}
-                alt={token.symbol}
-                className="w-7 h-7 rounded-full"
-                onError={(e) => {
-                  const parent = (e.target as HTMLImageElement).parentElement;
-                  if (parent) {
+            <div className="w-9 h-9 rounded-xl glass-card flex items-center justify-center overflow-hidden border border-white/10 group-hover:border-base-blue/30 transition-colors">
+              {token.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={token.logoUrl}
+                  alt={token.symbol}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
                     (e.target as HTMLImageElement).style.display = "none";
-                    const fallback = parent.querySelector(".fallback-avatar") as HTMLElement;
-                    if (fallback) fallback.style.display = "flex";
-                  }
-                }}
-              />
-            ) : null}
-            <span
-              className={`fallback-avatar w-7 h-7 rounded-full items-center justify-center text-xs font-bold ${token.logoUrl ? "hidden" : "flex"}`}
-              style={{ background: token.logoColor + "22", color: token.logoColor }}
-            >
-              {token.logoLetter}
-            </span>
-            {isDead && (
-              <span className="absolute -top-1 -right-1 text-[8px]">🔥</span>
+                    const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                    if (fallback) fallback.classList.remove("hidden");
+                  }}
+                />
+              ) : null}
+              <span
+                className={`w-full h-full items-center justify-center text-sm font-bold ${token.logoUrl ? "hidden" : "flex"}`}
+                style={{ background: token.logoColor + "15", color: token.logoColor }}
+              >
+                {token.logoLetter}
+              </span>
+            </div>
+            {isPossiblyDead && (
+              <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center text-[10px] shadow-lg border border-black/20">
+                🔥
+              </div>
             )}
           </div>
 
           {/* Name + symbol */}
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-semibold text-white">{token.symbol}</span>
-              {isDead && (
-                <span className="text-[9px] text-orange-500/80 bg-orange-500/10 px-1.5 py-0.5 rounded-full border border-orange-500/20">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-white group-hover:text-base-blue transition-colors">{token.symbol}</span>
+              {isPossiblyDead && (
+                <span className="text-[10px] font-medium text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-lg border border-orange-500/20">
                   بلا سيولة
                 </span>
               )}
-              {!token.canSell && (
-                <span className="text-[9px] text-[#0052FF]/60 bg-[#0052FF]/10 px-1.5 py-0.5 rounded-full">
-                  USDC
+              {!token.canSell && isUsdc && (
+                <span className="text-[10px] font-black text-white bg-base-blue px-2 py-0.5 rounded-lg border border-white/20 shadow-[0_0_10px_rgba(0,82,255,0.3)]">
+                  رصيد آمن ✨
                 </span>
               )}
             </div>
-            <div className="text-[10px] text-gray-600 truncate max-w-20">{token.name}</div>
+            <div className="text-[11px] text-slate-500 truncate max-w-[120px] font-medium mt-0.5">{token.name}</div>
           </div>
         </div>
       </td>
 
       {/* Balance */}
-      <td className="py-3 text-right">
-        <div className="text-xs text-gray-400">
+      <td className="py-4 text-right">
+        <div className="text-sm font-semibold text-slate-300">
           {token.balanceFormatted >= 1
             ? token.balanceFormatted.toLocaleString(undefined, { maximumFractionDigits: 2 })
             : token.balanceFormatted.toFixed(6)}
@@ -111,8 +110,8 @@ export function TokenRow({ token, selected, onToggle, isLive }: TokenRowProps) {
       </td>
 
       {/* Price */}
-      <td className="py-3 text-right">
-        <div className="text-xs text-gray-500">
+      <td className="py-4 text-right">
+        <div className="text-sm font-medium text-slate-500">
           {token.usdPrice > 0
             ? `$${token.usdPrice < 0.01 ? token.usdPrice.toFixed(6) : token.usdPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })}`
             : "—"}
@@ -120,13 +119,13 @@ export function TokenRow({ token, selected, onToggle, isLive }: TokenRowProps) {
       </td>
 
       {/* USD Value */}
-      <td className="py-3 pr-4 text-right">
-        <div className={`text-xs font-medium ${
-          hasValue ? (token.usdValue >= 10 ? "text-emerald-400" : "text-gray-300") : "text-gray-700"
+      <td className="py-4 pr-5 text-right">
+        <div className={`text-sm font-bold tabular-nums ${
+          hasValue ? (token.usdValue >= 10 ? "text-emerald-400" : "text-white") : "text-slate-700"
         }`}>
           {hasValue
             ? `$${token.usdValue >= 0.01 ? token.usdValue.toFixed(2) : token.usdValue.toFixed(6)}`
-            : "—"}
+            : "$0.00"}
         </div>
       </td>
     </tr>

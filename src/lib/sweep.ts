@@ -15,18 +15,17 @@ import {
 } from "viem";
 import {
   UNISWAP_V3_ROUTER,
-  UNISWAP_V3_QUOTER,
   TOKENS,
-  FEE_TIERS,
   ERC20_ABI,
-  SWAP_ROUTER_ABI,
-  QUOTER_ABI,
   FEE_RECIPIENT,
   PROTOCOL_FEE_BPS,
   BURN_ADDRESS,
   MIN_SWAP_VALUE_USDC,
 } from "@/config/contracts";
 import { splitFee } from "@/lib/referral";
+import { get0xQuote } from "@/lib/zerox";
+import { UNSELLABLE } from "@/lib/tokens";
+
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -45,12 +44,17 @@ export interface SweepQuote {
   action: TokenAction;
   amountIn: bigint;
   amountOutMinimum?: bigint;
-  feeTier?: number;
   estimatedOut?: bigint;
   protocolFee?: bigint;
   referrerFee?: bigint;
   userReceives?: bigint;
+  tx?: {
+    to: Address;
+    data: `0x${string}`;
+    value: bigint;
+  };
 }
+
 
 export interface SweepResult {
   sellQuotes: SweepQuote[];
@@ -62,35 +66,8 @@ export interface SweepResult {
   referrer?: Address;
 }
 
-// ─── 1. Find best Uniswap V3 fee tier ────────────────────────────────────────
+// findBestFeeTier removed in favor of 0x aggregator
 
-export async function findBestFeeTier(
-  publicClient: PublicClient,
-  tokenIn: Address,
-  amountIn: bigint
-): Promise<{ feeTier: number; amountOut: bigint } | null> {
-  const amountAfterFee = amountIn - (amountIn * PROTOCOL_FEE_BPS) / BigInt(10000);
-  const feeTiers = [FEE_TIERS.LOW, FEE_TIERS.MEDIUM, FEE_TIERS.HIGH, FEE_TIERS.LOWEST];
-  let best: { feeTier: number; amountOut: bigint } | null = null;
-
-  for (const fee of feeTiers) {
-    try {
-      const result = await publicClient.simulateContract({
-        address: UNISWAP_V3_QUOTER,
-        abi: QUOTER_ABI,
-        functionName: "quoteExactInputSingle",
-        args: [{ tokenIn, tokenOut: TOKENS.USDC, amountIn: amountAfterFee, fee, sqrtPriceLimitX96: BigInt(0) }],
-      });
-      const amountOut = result.result[0] as bigint;
-      if (amountOut > 0 && (!best || amountOut > best.amountOut)) {
-        best = { feeTier: fee, amountOut };
-      }
-    } catch {
-      // Pool not found — try next
-    }
-  }
-  return best;
-}
 
 // ─── 2. Classify tokens: sell vs burn ────────────────────────────────────────
 
@@ -98,6 +75,7 @@ export async function classifyTokens(
   publicClient: PublicClient,
   tokens: TokenToProcess[],
   slippageBps: number,
+  taker: Address,
   referrer?: Address
 ): Promise<SweepResult> {
   const sellQuotes: SweepQuote[] = [];
@@ -107,34 +85,66 @@ export async function classifyTokens(
 
   await Promise.all(
     tokens.map(async (token) => {
-      const quote = await findBestFeeTier(publicClient, token.address, token.balance);
-
-      if (!quote || quote.amountOut === BigInt(0) || quote.amountOut < MIN_SWAP_VALUE_USDC) {
-        burnQuotes.push({ token, action: "burn", amountIn: token.balance });
-        return;
+      // ─── a) Skip USDC/USDbC (Target Asset) ──────────────────────────────────
+      if (UNSELLABLE.has(token.address.toLowerCase())) {
+        return; // Just ignore, don't add to sell or burn
       }
 
-      const totalFeeAmount = (quote.amountOut * PROTOCOL_FEE_BPS) / BigInt(10000);
-      const { referrerBps, protocolBps } = splitFee(PROTOCOL_FEE_BPS, hasReferrer);
+      try {
+        const amountAfterFee = token.balance - (token.balance * PROTOCOL_FEE_BPS) / BigInt(10000);
+        
+        // 0x Aggregator - Finds best price across all DEXs on Base
+        const quote = await get0xQuote(
+          token.address,
+          TOKENS.USDC,
+          amountAfterFee.toString(),
+          taker
+        );
 
-      const protocolFee = (quote.amountOut * protocolBps) / BigInt(10000);
-      const referrerFee = hasReferrer
-        ? (quote.amountOut * referrerBps) / BigInt(10000)
-        : BigInt(0);
-      const userReceives = quote.amountOut - totalFeeAmount;
-      const amountOutMinimum = (userReceives * BigInt(Math.max(0, 10000 - slippageBps))) / BigInt(10000);
+        const amountOut = BigInt(quote.buyAmount);
 
-      sellQuotes.push({
-        token,
-        action: "sell",
-        amountIn: token.balance,
-        feeTier: quote.feeTier,
-        estimatedOut: quote.amountOut,
-        protocolFee,
-        referrerFee,
-        userReceives,
-        amountOutMinimum,
-      });
+        // Even if GeckoTerminal says 0, if 0x can find a route for > MIN, it's a sell!
+        if (amountOut === BigInt(0) || amountOut < MIN_SWAP_VALUE_USDC) {
+          burnQuotes.push({ token, action: "burn", amountIn: token.balance });
+          return;
+        }
+
+        const totalFeeAmount = (amountOut * PROTOCOL_FEE_BPS) / BigInt(10000);
+        const { referrerBps, protocolBps } = splitFee(PROTOCOL_FEE_BPS, hasReferrer);
+
+        const protocolFee = (amountOut * protocolBps) / BigInt(10000);
+        const referrerFee = hasReferrer
+          ? (amountOut * referrerBps) / BigInt(10000)
+          : BigInt(0);
+        const userReceives = amountOut - totalFeeAmount;
+        
+        const amountOutMinimum = BigInt(quote.minBuyAmount || 0);
+
+        sellQuotes.push({
+          token,
+          action: "sell",
+          amountIn: token.balance,
+          estimatedOut: amountOut,
+          protocolFee,
+          referrerFee,
+          userReceives,
+          amountOutMinimum,
+          tx: {
+            to: quote.to as Address,
+            data: quote.data as `0x${string}`,
+            value: BigInt(quote.value || 0),
+          },
+        });
+      } catch (err) {
+        // Log error but don't mark as burn if it's a known high-value token
+        // If 0x fail for any reason, we assume it's a burn (no liquidity / unswappable)
+        // unless it has significant USD value from GeckoTerminal, then it's a technical error.
+        if (token.usdValue < 0.01) {
+          burnQuotes.push({ token, action: "burn", amountIn: token.balance });
+        } else {
+          console.error(`0x Quote failed for ${token.symbol} (${token.usdValue} USD):`, err);
+        }
+      }
     })
   );
 
@@ -158,21 +168,25 @@ export async function classifyTokens(
 export async function checkApprovals(
   publicClient: PublicClient,
   owner: Address,
-  tokens: TokenToProcess[]
-): Promise<Address[]> {
-  const needsApproval: Address[] = [];
+  tokens: { address: Address; balance: bigint; spender?: Address }[]
+): Promise<{ tokenAddress: Address; spender: Address }[]> {
+  const needsApproval: { tokenAddress: Address; spender: Address }[] = [];
   await Promise.all(
     tokens.map(async (token) => {
+      const spender = token.spender || UNISWAP_V3_ROUTER;
       try {
         const allowance = await publicClient.readContract({
           address: token.address,
           abi: ERC20_ABI,
           functionName: "allowance",
-          args: [owner, UNISWAP_V3_ROUTER],
+          args: [owner, spender],
         });
-        if ((allowance as bigint) < token.balance) needsApproval.push(token.address);
+
+        if ((allowance as bigint) < token.balance) {
+          needsApproval.push({ tokenAddress: token.address, spender });
+        }
       } catch {
-        needsApproval.push(token.address);
+        needsApproval.push({ tokenAddress: token.address, spender });
       }
     })
   );
@@ -182,13 +196,14 @@ export async function checkApprovals(
 export async function approveToken(
   walletClient: WalletClient,
   tokenAddress: Address,
+  spender: Address,
   account: Address
 ): Promise<`0x${string}`> {
   return walletClient.writeContract({
     address: tokenAddress,
     abi: ERC20_ABI,
     functionName: "approve",
-    args: [UNISWAP_V3_ROUTER, maxUint256],
+    args: [spender, maxUint256],
     account,
     chain: walletClient.chain,
   });
@@ -199,72 +214,20 @@ export async function approveToken(
 export async function executeSell(
   walletClient: WalletClient,
   publicClient: PublicClient,
-  quotes: SweepQuote[],
-  recipient: Address,
-  referrer?: Address
+  quote: SweepQuote,
+  recipient: Address
 ): Promise<`0x${string}`> {
-  if (quotes.length === 0) throw new Error("لا توجد رموز للبيع");
+  if (!quote.tx) throw new Error(`Missing TX data for ${quote.token.symbol}`);
 
-  // Send referrer fee before swap if applicable
-  if (referrer && referrer !== FEE_RECIPIENT) {
-    for (const q of quotes) {
-      if (q.referrerFee && q.referrerFee > 0) {
-        try {
-          // Transfer referrer fee portion of the token before swapping
-          // Note: In a real implementation this would be done inside a contract
-          // For now we record it for post-swap accounting
-        } catch { /* ignore */ }
-      }
-    }
-  }
-
-  const swapCalldatas: `0x${string}`[] = quotes.map((q) => {
-    const swapAmount = q.amountIn - (q.amountIn * PROTOCOL_FEE_BPS) / BigInt(10000);
-    return encodeFunctionData({
-      abi: SWAP_ROUTER_ABI,
-      functionName: "exactInputSingle",
-      args: [{
-        tokenIn: q.token.address,
-        tokenOut: TOKENS.USDC,
-        fee: q.feeTier!,
-        recipient,
-        amountIn: swapAmount,
-        amountOutMinimum: q.amountOutMinimum ?? BigInt(0),
-        sqrtPriceLimitX96: BigInt(0),
-      }],
-    });
-  });
-
-  if (swapCalldatas.length === 1) {
-    const q = quotes[0];
-    const swapAmount = q.amountIn - (q.amountIn * PROTOCOL_FEE_BPS) / BigInt(10000);
-    return walletClient.writeContract({
-      address: UNISWAP_V3_ROUTER,
-      abi: SWAP_ROUTER_ABI,
-      functionName: "exactInputSingle",
-      args: [{
-        tokenIn: q.token.address,
-        tokenOut: TOKENS.USDC,
-        fee: q.feeTier!,
-        recipient,
-        amountIn: swapAmount,
-        amountOutMinimum: q.amountOutMinimum ?? BigInt(0),
-        sqrtPriceLimitX96: BigInt(0),
-      }],
-      account: recipient,
-      chain: walletClient.chain,
-    });
-  }
-
-  return walletClient.writeContract({
-    address: UNISWAP_V3_ROUTER,
-    abi: SWAP_ROUTER_ABI,
-    functionName: "multicall",
-    args: [swapCalldatas],
+  return walletClient.sendTransaction({
+    to: quote.tx.to,
+    data: quote.tx.data,
+    value: quote.tx.value,
     account: recipient,
     chain: walletClient.chain,
   });
 }
+
 
 // ─── 5. Execute BURN ─────────────────────────────────────────────────────────
 
@@ -281,14 +244,14 @@ export async function executeBurn(
       const hash = await walletClient.writeContract({
         address: q.token.address,
         abi: ERC20_ABI,
-        functionName: "approve",
+        functionName: "transfer",
         args: [BURN_ADDRESS, q.amountIn],
         account: sender,
         chain: walletClient.chain,
       });
       hashes.push(hash);
-    } catch {
-      // Some blocked tokens may fail — ignore
+    } catch (err) {
+      console.error(`Failed to burn ${q.token.symbol}:`, err);
     }
   }
   return hashes;

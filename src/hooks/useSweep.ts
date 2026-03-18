@@ -69,10 +69,11 @@ export function useSweep() {
     async (tokens: TokenToProcess[], slippageBps: number, referrer?: Address) => {
       if (!publicClient || !address) return null;
 
-      patch({ status: "classifying", currentStep: "🔍 تحليل الأسعار عبر Uniswap..." });
+      patch({ status: "classifying", currentStep: "🔍 تحليل السيولة عبر 0x Aggregator..." });
 
       try {
-        const result = await classifyTokens(publicClient, tokens, slippageBps, referrer);
+        const result = await classifyTokens(publicClient, tokens, slippageBps, address, referrer);
+
 
         patch({
           status: "idle",
@@ -111,24 +112,30 @@ export function useSweep() {
         if (result.sellQuotes.length > 0) {
           patch({ status: "approving", currentStep: "التحقق من الصلاحيات..." });
 
+          const tokensForApproval = result.sellQuotes.map((q) => ({
+            address: q.token.address,
+            balance: q.token.balance,
+            spender: q.tx?.to,
+          }));
+
           const needApproval = await checkApprovals(
             publicClient,
             address,
-            result.sellQuotes.map((q) => q.token)
+            tokensForApproval
           );
 
           patch({ approvalsNeeded: needApproval.length, approvalsComplete: 0 });
 
           for (let i = 0; i < needApproval.length; i++) {
-            const tokenAddr = needApproval[i];
+            const { tokenAddress, spender } = needApproval[i];
             const sym =
               result.sellQuotes.find(
-                (q) => q.token.address.toLowerCase() === tokenAddr.toLowerCase()
+                (q) => q.token.address.toLowerCase() === tokenAddress.toLowerCase()
               )?.token.symbol ?? "...";
 
             patch({ currentStep: `موافقة على ${sym} (${i + 1}/${needApproval.length})` });
 
-            const tx = await approveToken(walletClient, tokenAddr, address);
+            const tx = await approveToken(walletClient, tokenAddress, spender, address);
             await publicClient.waitForTransactionReceipt({ hash: tx });
             patch({ approvalsComplete: i + 1 });
           }
@@ -137,19 +144,22 @@ export function useSweep() {
         // ── b) Sell ───────────────────────────────────────────────────────
         let sellTxHash: `0x${string}` | undefined;
         if (result.sellQuotes.length > 0) {
-          patch({
-            status: "selling",
-            currentStep: `💰 بيع ${result.sellQuotes.length} رمز → USDC...`,
-          });
+          for (let i = 0; i < result.sellQuotes.length; i++) {
+            const quote = result.sellQuotes[i];
+            patch({
+              status: "selling",
+              currentStep: `💰 بيع ${quote.token.symbol} (${i + 1}/${result.sellQuotes.length})...`,
+            });
 
-          sellTxHash = await executeSell(
-            walletClient,
-            publicClient,
-            result.sellQuotes,
-            address,
-            result.referrer
-          );
-          await publicClient.waitForTransactionReceipt({ hash: sellTxHash });
+            sellTxHash = await executeSell(
+              walletClient,
+              publicClient,
+              quote,
+              address
+            );
+
+            await publicClient.waitForTransactionReceipt({ hash: sellTxHash });
+          }
         }
 
         // ── c) Burn ───────────────────────────────────────────────────────

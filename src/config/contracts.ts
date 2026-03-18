@@ -1,22 +1,27 @@
-// src/config/contracts.ts
-// All deployed contract addresses on Base Mainnet (chainId: 8453)
+import { type Address } from "viem";
 
 export const CHAIN_ID = 8453; // Base Mainnet
 
 // ─── CoinBin Protocol Settings ───────────────────────────────────────────────
 // ⚠️  استبدل هذا العنوان بعنوان محفظتك لاستقبال الرسوم
-export const FEE_RECIPIENT = "0x296Bd27a4702f5cf0a5362452540eF7a1E4ce36D" as const;
+export const FEE_RECIPIENT = (process.env.NEXT_PUBLIC_FEE_RECIPIENT || "0x296Bd27a4702f5cf0a5362452540eF7a1E4ce36D") as Address;
 
 // رسوم البروتوكول: 30 = 0.30% من كل صفقة
 // مثال: مستخدم يبيع $1000 → تحصل على $3.00
 export const PROTOCOL_FEE_BPS = BigInt(30); // basis points (30 / 10000 = 0.3%)
 
+// ─── 0x API Settings ────────────────────────────────────────────────────────
+export const ZEROX_API_URL = process.env.NEXT_PUBLIC_ZEROX_API_URL || "https://base.api.0x.org/swap/v1/quote";
+export const ZEROX_API_KEY = process.env.NEXT_PUBLIC_ZEROX_API_KEY || "";
+export const SLIPPAGE = Number(process.env.NEXT_PUBLIC_SLIPPAGE || "0.01");
+
+
 // عنوان الحرق الكوني — لا أحد يملك المفتاح الخاص لهذا العنوان
 export const BURN_ADDRESS = "0x000000000000000000000000000000000000dEaD" as const;
 
 // الحد الأدنى لقيمة التوكن بالـ USDC لمحاولة البيع (أقل من كده → حرق مباشر)
-// 6 decimals لـ USDC: 1000 = $0.001
-export const MIN_SWAP_VALUE_USDC = BigInt(1000); // $0.001
+// 6 decimals لـ USDC: 1 = $0.000001
+export const MIN_SWAP_VALUE_USDC = BigInt(1); // $0.000001
 
 // ─── Uniswap V3 on Base ───────────────────────────────────────────────────────
 export const UNISWAP_V3_ROUTER = "0x2626664c2603336E57B271c5C0b26F421741e481" as const;
@@ -87,6 +92,16 @@ export const ERC20_ABI = [
     stateMutability: "view",
     inputs: [],
     outputs: [{ name: "", type: "string" }],
+  },
+  {
+    name: "transfer",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "recipient", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
   },
 ] as const;
 
