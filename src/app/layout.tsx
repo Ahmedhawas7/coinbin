@@ -14,6 +14,9 @@ export const metadata: Metadata = {
     description: "نظّف محفظتك: بيع الرموز → USDC وحرق الغبار في ضغطة واحدة على Base",
     siteName: "CoinBin",
   },
+  other: {
+    "base:app_id": "697b0897748a9bde7c61ab55",
+  },
 };
 
 export default function RootLayout({
