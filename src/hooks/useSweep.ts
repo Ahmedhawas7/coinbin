@@ -198,7 +198,7 @@ export function useSweep() {
             },
           });
 
-          patch({ status: "success", sellTxHash: bundleId, currentStep: "✅ اكتمل!" });
+          patch({ status: "success", sellTxHash: (bundleId as any)?.id || bundleId, currentStep: "✅ اكتمل!" });
           return;
         }
 

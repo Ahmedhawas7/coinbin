@@ -1,20 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { type SweepState } from "@/hooks/useSweep";
 import { type TokenBalance } from "@/hooks/useTokenBalances";
 import { formatUSDC, calcProtocolFeeUSD } from "@/lib/sweep";
 import { PROTOCOL_FEE_BPS } from "@/config/contracts";
-import { 
-  Swap, 
-  SwapAmountInput, 
-  SwapToggleButton, 
-  SwapButton, 
-  SwapMessage, 
-  SwapToast,
-  SwapSettings,
-} from "@coinbase/onchainkit/swap";
-import { TOKENS } from "@/lib/tokens";
 
 interface SweepPanelProps {
   selectedTokens: TokenBalance[];
@@ -78,9 +68,7 @@ export function SweepPanel({
   onExecute,
   onReset,
   isConnected,
-  onAutoClassify,
 }: SweepPanelProps) {
-  const [showSingleSwap, setShowSingleSwap] = useState(false);
   const { status, sweepResult, currentStep, sellTxHash, error,
           approvalsNeeded, approvalsComplete } = sweepState;
   const isProcessing = ["classifying", "approving", "selling", "burning"].includes(status);
@@ -141,313 +129,224 @@ export function SweepPanel({
       </div>
 
       <div className="p-6 space-y-6">
-        {/* Toggle between Sweep and Single Swap */}
-        {!isProcessing && status !== "success" && (
-          <div className="space-y-3">
-            <div className="flex p-1 bg-white/[0.02] border border-white/5 rounded-2xl">
-              <button 
-                onClick={() => setShowSingleSwap(false)}
-                className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${!showSingleSwap ? "bg-base-blue/10 text-base-blue shadow-inner" : "text-slate-500 hover:text-slate-300"}`}
-              >
-                Bulk Sweep 🗑️
-              </button>
-              <button 
-                onClick={() => setShowSingleSwap(true)}
-                className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${showSingleSwap ? "bg-base-blue/10 text-base-blue shadow-inner" : "text-slate-500 hover:text-slate-300"}`}
-              >
-                Pro Swap 💰
-              </button>
-            </div>
-
-            {/* Smart Wallet Capability Indicators */}
-            {(sweepState.isBatchingSupported || sweepState.isPaymasterSupported) && !showSingleSwap && (
-              <div className="flex flex-wrap gap-2 px-1">
-                {sweepState.isBatchingSupported && (
-                  <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black text-emerald-400 uppercase tracking-widest animate-in fade-in slide-in-from-top-1">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M12 2v20M2 12h20"/></svg>
-                    Atomic Batching
-                  </div>
-                )}
-                {sweepState.isPaymasterSupported && (
-                  <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-base-blue/10 border border-base-blue/20 text-[9px] font-black text-base-blue uppercase tracking-widest animate-in fade-in slide-in-from-top-1">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-                    Gas Sponsored
-                  </div>
-                )}
+        {/* Smart Wallet Capability Indicators */}
+        {(sweepState.isBatchingSupported || sweepState.isPaymasterSupported) && !isProcessing && status !== "success" && (
+          <div className="flex flex-wrap gap-2 px-1">
+            {sweepState.isBatchingSupported && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-black text-emerald-400 uppercase tracking-widest animate-in fade-in slide-in-from-top-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M12 2v20M2 12h20"/></svg>
+                Atomic Batching
+              </div>
+            )}
+            {sweepState.isPaymasterSupported && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-base-blue/10 border border-base-blue/20 text-[10px] font-black text-base-blue uppercase tracking-widest animate-in fade-in slide-in-from-top-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                Gas Sponsored
               </div>
             )}
           </div>
         )}
 
-        {showSingleSwap && !isProcessing && status !== "success" ? (
-          <div className="animate-in fade-in zoom-in duration-300">
-            <div className="flex items-center gap-2 mb-4 text-[11px] font-black text-slate-500 uppercase tracking-widest px-1">
-              <span>Trade API Swaps</span>
-              <span className="text-[10px] text-emerald-500 bg-emerald-500/10 px-2 rounded-lg">Official CDP Hub</span>
+        <div className="space-y-6">
+          {/* ─── Success ──────────────────────────────────────────────────── */}
+          {status === "success" && (
+            <div className="text-center py-4 space-y-4 animate-fade-in group">
+              <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto text-4xl shadow-[0_0_40px_rgba(16,185,129,0.2)] border border-emerald-500/30 group-hover:scale-110 transition-transform duration-500">
+                ✅
+              </div>
+              <div className="space-y-1">
+                <div className="text-lg font-black text-white">تم التنظيف!</div>
+                <div className="text-sm text-slate-400">
+                  استلمت <span className="text-emerald-400 font-bold">{sweepState.formattedUserReceives}</span> USDC
+                </div>
+              </div>
+              {sellTxHash && (
+                <a
+                  href={`https://basescan.org/tx/${sellTxHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/5 text-[11px] text-base-blue hover:bg-base-blue/10 transition-colors font-bold uppercase tracking-wider"
+                >
+                  عرض المعاملة ↗
+                </a>
+              )}
             </div>
-            
-            <Swap className="w-full !bg-transparent !border-0 !p-0">
-              <div className="space-y-3">
-                {/* @ts-ignore */}
-                <SwapAmountInput
-                  label="Sell"
-                  swappableTokens={selectedTokens.map(t => ({
-                    address: t.address as `0x${string}`,
-                    symbol: t.symbol,
-                    name: t.name,
-                    decimals: t.decimals,
-                    image: t.logoUrl || "",
-                    chainId: 8453
-                  }))}
-                  type="from"
-                  className="!bg-white/[0.03] !border-white/5 !rounded-2xl"
-                />
-                <div className="flex justify-center -my-4 relative z-10">
-                  {/* @ts-ignore */}
-                  <SwapToggleButton className="!bg-slate-900 !border-white/10 !w-8 !h-8 !rounded-full !hover:scale-110" />
-                </div>
-                {/* @ts-ignore */}
-                <SwapAmountInput
-                  label="Receive"
-                  swappableTokens={[{
-                    address: TOKENS.USDC as `0x${string}`,
-                    symbol: "USDC",
-                    name: "USDC",
-                    decimals: 6,
-                    image: "https://raw.githubusercontent.com/base-org/brand-kit/main/logo/symbol/Base_Symbol_Blue.svg",
-                    chainId: 8453
-                  }]}
-                  type="to"
-                  className="!bg-white/[0.03] !border-white/5 !rounded-2xl"
-                />
-              </div>
-              
-              <div className="mt-6">
-                {/* @ts-ignore */}
-                <SwapButton 
-                  className="!w-full !py-5 !rounded-2xl !bg-base-blue !hover:bg-base-blue/90 !text-white !font-black !uppercase !tracking-widest !shadow-[0_0_20px_rgba(0,82,255,0.3)] !transition-all" 
-                />
-              </div>
-              {/* @ts-ignore */}
-              <SwapMessage className="!text-[10px] !text-slate-500 !mt-2 !text-center" />
-              {/* @ts-ignore */}
-              <SwapToast className="!fixed !bottom-6 !right-6 !z-[100]" />
-              {/* @ts-ignore */}
-              <SwapSettings />
-            </Swap>
+          )}
 
-            <div className="mt-4 px-2 py-3 bg-base-blue/5 border border-base-blue/10 rounded-2xl">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-black text-base-blue uppercase tracking-widest">Base Smart Wallet Features</span>
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 status-pulse" />
-              </div>
-              <p className="text-[10px] text-slate-400 font-medium">
-                تم دمج **CDP Trade API** لتوفير أسرع تنفيذ في أقل من 500ms مع دعم **Gas Sponsorship** لمستخدمي محافظ Coinbase الذكية.
-              </p>
+          {/* ─── Error ────────────────────────────────────────────────────── */}
+          {status === "error" && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-center space-y-2">
+              <div className="text-2xl">⚠️</div>
+              <div className="text-sm font-medium text-red-400">{error}</div>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* ─── Success ──────────────────────────────────────────────────── */}
-            {status === "success" && (
-              <div className="text-center py-4 space-y-4 animate-fade-in group">
-                <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto text-4xl shadow-[0_0_40px_rgba(16,185,129,0.2)] border border-emerald-500/30 group-hover:scale-110 transition-transform duration-500">
-                  ✅
-                </div>
-                <div className="space-y-1">
-                  <div className="text-lg font-black text-white">تم التنظيف!</div>
-                  <div className="text-sm text-slate-400">
-                    استلمت <span className="text-emerald-400 font-bold">{sweepState.formattedUserReceives}</span> USDC
+          )}
+
+          {/* ─── Processing ───────────────────────────────────────────────── */}
+          {isProcessing && (
+            <div className="space-y-4 py-2">
+              <StageBar status={status} />
+              <div className="glass-card rounded-xl p-3 flex items-center gap-3">
+                <span className="w-2 h-2 rounded-full bg-base-blue status-pulse" />
+                <span className="text-xs font-bold text-slate-400">{currentStep}</span>
+              </div>
+              {status === "approving" && approvalsNeeded > 0 && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    <span>الموافقات المطلوبة</span>
+                    <span>{approvalsComplete}/{approvalsNeeded}</span>
+                  </div>
+                  <div className="h-1.5 bg-slate-900 rounded-full overflow-hidden border border-white/5">
+                    <div
+                      className="h-full bg-base-blue shadow-[0_0_10px_rgba(0,82,255,0.5)] transition-all duration-700 ease-out"
+                      style={{ width: `${(approvalsComplete / approvalsNeeded) * 100}%` }}
+                    />
                   </div>
                 </div>
-                {sellTxHash && (
-                  <a
-                    href={`https://basescan.org/tx/${sellTxHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/5 text-[11px] text-base-blue hover:bg-base-blue/10 transition-colors font-bold uppercase tracking-wider"
-                  >
-                    عرض المعاملة ↗
-                  </a>
-                )}
-              </div>
-            )}
+              )}
+            </div>
+          )}
 
-            {/* ─── Error ────────────────────────────────────────────────────── */}
-            {status === "error" && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-center space-y-2">
-                <div className="text-2xl">⚠️</div>
-                <div className="text-sm font-medium text-red-400">{error}</div>
-              </div>
-            )}
-
-            {/* ─── Processing ───────────────────────────────────────────────── */}
-            {isProcessing && (
-              <div className="space-y-4 py-2">
-                <StageBar status={status} />
-                <div className="glass-card rounded-xl p-3 flex items-center gap-3">
-                  <span className="w-2 h-2 rounded-full bg-base-blue status-pulse" />
-                  <span className="text-xs font-bold text-slate-400">{currentStep}</span>
+          {/* ─── Idle: Token breakdown ────────────────────────────────────── */}
+          {!isProcessing && status !== "success" && status !== "error" && (
+            <>
+              {selectedTokens.length === 0 ? (
+                <div className="py-12 text-center space-y-4">
+                  <div className="w-16 h-16 bg-slate-900/50 rounded-2xl flex items-center justify-center mx-auto text-3xl border border-white/5 opacity-50">
+                    🗑️
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-slate-400">سلة العملات فارغة</p>
+                    <p className="text-[11px] text-slate-600">اختر الرموز التي تريد التخلص منها</p>
+                  </div>
                 </div>
-                {status === "approving" && approvalsNeeded > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                      <span>الموافقات المطلوبة</span>
-                      <span>{approvalsComplete}/{approvalsNeeded}</span>
-                    </div>
-                    <div className="h-1.5 bg-slate-900 rounded-full overflow-hidden border border-white/5">
-                      <div
-                        className="h-full bg-base-blue shadow-[0_0_10px_rgba(0,82,255,0.5)] transition-all duration-700 ease-out"
-                        style={{ width: `${(approvalsComplete / approvalsNeeded) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ─── Idle: Token breakdown ────────────────────────────────────── */}
-            {!isProcessing && status !== "success" && status !== "error" && (
-              <>
-                {selectedTokens.length === 0 ? (
-                  <div className="py-12 text-center space-y-4">
-                    <div className="w-16 h-16 bg-slate-900/50 rounded-2xl flex items-center justify-center mx-auto text-3xl border border-white/5 opacity-50">
-                      🗑️
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm font-bold text-slate-400">سلة العملات فارغة</p>
-                      <p className="text-[11px] text-slate-600">اختر الرموز التي تريد التخلص منها</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Classified results */}
-                    {sweepResult ? (
-                      <div className="space-y-3">
-                        {sweepResult.sellQuotes.length > 0 && (
-                          <div className="glass-card rounded-2xl p-4 border-emerald-500/10">
-                            <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
-                              <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                                جاهز للبيع ({sweepResult.sellQuotes.length})
-                              </span>
-                            </div>
-                            <div className="space-y-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
-                              {sweepResult.sellQuotes.map((q) => (
-                                <div key={q.token.address} className="flex justify-between items-center group/item hover:bg-white/[0.02] p-1 rounded-lg transition-colors">
-                                  <span className="text-xs font-bold text-slate-400 group-hover/item:text-white transition-colors">{q.token.symbol}</span>
-                                  <span className="text-xs font-black text-white tabular-nums">
-                                    {formatUSDC(q.userReceives ?? 0n)}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Classified results */}
+                  {sweepResult ? (
+                    <div className="space-y-3">
+                      {sweepResult.sellQuotes.length > 0 && (
+                        <div className="glass-card rounded-2xl p-4 border-emerald-500/10">
+                          <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
+                            <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                              جاهز للبيع ({sweepResult.sellQuotes.length})
+                            </span>
                           </div>
-                        )}
-                        {sweepResult.burnQuotes.length > 0 && (
-                          <div className="glass-card rounded-2xl p-4 border-orange-500/10">
-                            <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
-                              <span className="text-[11px] font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-orange-500" />
-                                عملات ميتة ({sweepResult.burnQuotes.length})
-                              </span>
-                            </div>
-                            <div className="space-y-2 max-h-24 overflow-y-auto pr-2 custom-scrollbar">
-                              {sweepResult.burnQuotes.map((q) => (
-                                <div key={q.token.address} className="flex justify-between items-center">
-                                  <span className="text-xs font-bold text-slate-500">{q.token.symbol}</span>
-                                  <span className="text-[10px] font-black text-orange-900 uppercase">حرق فوري</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      /* Preview */
-                      <div className="space-y-3 glass-card rounded-2xl p-4 border-white/5">
-                        <div className="text-[11px] font-black text-slate-500 uppercase tracking-wider mb-2">معاينة العملات ({selectedTokens.length})</div>
-                        <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                          {selectedTokens.map((t) => (
-                            <div key={t.address} className="flex items-center justify-between py-1">
-                              <div className="flex items-center gap-2">
-                                <div className="w-5 h-5 rounded-md glass-card flex items-center justify-center text-[10px] font-bold border border-white/5" style={{ color: t.logoColor }}>
-                                  {t.logoLetter}
-                                </div>
-                                <span className="text-xs font-bold text-slate-300">{t.symbol}</span>
+                          <div className="space-y-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
+                            {sweepResult.sellQuotes.map((q) => (
+                              <div key={q.token.address} className="flex justify-between items-center group/item hover:bg-white/[0.02] p-1 rounded-lg transition-colors">
+                                <span className="text-xs font-bold text-slate-400 group-hover/item:text-white transition-colors">{q.token.symbol}</span>
+                                <span className="text-xs font-black text-white tabular-nums">
+                                  {formatUSDC(q.userReceives ?? 0n)}
+                                </span>
                               </div>
-                              <span className="text-xs font-bold text-slate-500 tabular-nums">
-                                ~${t.usdValue >= 0.01 ? t.usdValue.toFixed(2) : t.usdValue.toFixed(6)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                        {status === "classifying" && (
-                          <div className="flex items-center gap-3 pt-3 border-t border-white/5">
-                            <div className="w-3 h-3 border-2 border-base-blue/20 border-t-base-blue rounded-full animate-spin" />
-                            <span className="text-[11px] font-bold text-base-blue animate-pulse uppercase tracking-wider">جارٍ تحليل السوق...</span>
+                            ))}
                           </div>
-                        )}
+                        </div>
+                      )}
+                      {sweepResult.burnQuotes.length > 0 && (
+                        <div className="glass-card rounded-2xl p-4 border-orange-500/10">
+                          <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
+                            <span className="text-[11px] font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-orange-500" />
+                              عملات ميتة ({sweepResult.burnQuotes.length})
+                            </span>
+                          </div>
+                          <div className="space-y-2 max-h-24 overflow-y-auto pr-2 custom-scrollbar">
+                            {sweepResult.burnQuotes.map((q) => (
+                              <div key={q.token.address} className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-slate-500">{q.token.symbol}</span>
+                                <span className="text-[10px] font-black text-orange-900 uppercase">حرق فوري</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Preview */
+                    <div className="space-y-3 glass-card rounded-2xl p-4 border-white/5">
+                      <div className="text-[11px] font-black text-slate-500 uppercase tracking-wider mb-2">معاينة العملات ({selectedTokens.length})</div>
+                      <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                        {selectedTokens.map((t) => (
+                          <div key={t.address} className="flex items-center justify-between py-1">
+                            <div className="flex items-center gap-2">
+                              <div className="w-5 h-5 rounded-md glass-card flex items-center justify-center text-[10px] font-bold border border-white/5" style={{ color: t.logoColor }}>
+                                {t.logoLetter}
+                              </div>
+                              <span className="text-xs font-bold text-slate-300">{t.symbol}</span>
+                            </div>
+                            <span className="text-xs font-bold text-slate-500 tabular-nums">
+                              ~${t.usdValue >= 0.01 ? t.usdValue.toFixed(2) : t.usdValue.toFixed(6)}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    )}
+                      {status === "classifying" && (
+                        <div className="flex items-center gap-3 pt-3 border-t border-white/5">
+                          <div className="w-3 h-3 border-2 border-base-blue/20 border-t-base-blue rounded-full animate-spin" />
+                          <span className="text-[11px] font-bold text-base-blue animate-pulse uppercase tracking-wider">جارٍ تحليل السوق...</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                    {/* Price summary */}
-                    <div className="glass-card rounded-2xl p-4 space-y-3 bg-white/[0.01] border-white/10">
-                      <div className="flex justify-between items-baseline">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">القيمة الإجمالية</span>
-                        <span className="text-sm font-bold text-slate-300 tracking-tight">${totalUSD.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between items-baseline">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">رسوم المنصة ({feePercent}%)</span>
-                        <span className="text-xs font-bold text-orange-500/80 tracking-tight">−${estimatedFeeUSD.toFixed(4)}</span>
-                      </div>
-                      <div className="border-t border-white/5 pt-3 flex justify-between items-end group">
-                        <span className="text-[11px] font-black text-white uppercase tracking-wider">ستحصل على</span>
-                        <span className="text-2xl font-black text-emerald-400 group-hover:scale-110 transition-transform duration-300 tracking-tighter">{netReceive} <span className="text-xs">USDC</span></span>
-                      </div>
+                  {/* Price summary */}
+                  <div className="glass-card rounded-2xl p-4 space-y-3 bg-white/[0.01] border-white/10">
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">القيمة الإجمالية</span>
+                      <span className="text-sm font-bold text-slate-300 tracking-tight">${totalUSD.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">رسوم المنصة ({feePercent}%)</span>
+                      <span className="text-xs font-bold text-orange-500/80 tracking-tight">−${estimatedFeeUSD.toFixed(4)}</span>
+                    </div>
+                    <div className="border-t border-white/5 pt-3 flex justify-between items-end group">
+                      <span className="text-[11px] font-black text-white uppercase tracking-wider">ستحصل على</span>
+                      <span className="text-2xl font-black text-emerald-400 group-hover:scale-110 transition-transform duration-300 tracking-tighter">{netReceive} <span className="text-xs">USDC</span></span>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Slippage selector */}
-                {selectedTokens.length > 0 && (
-                  <div className="flex items-center gap-3 bg-white/[0.02] p-2 rounded-2xl border border-white/5">
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter ml-1">الانزلاق:</span>
-                    <div className="flex gap-1 flex-1">
-                      {SLIPPAGE_OPTIONS.map((o) => (
-                        <button
-                          key={o.bps}
-                          onClick={() => onSlippageChange(o.bps)}
-                          className={`flex-1 text-[11px] font-black py-1.5 rounded-xl border transition-all duration-300 ${
-                            slippageBps === o.bps
-                              ? "border-base-blue/40 bg-base-blue/10 text-base-blue shadow-[0_0_15px_rgba(0,82,255,0.15)]"
-                              : "border-transparent text-slate-500 hover:bg-white/5"
-                          }`}
-                        >
-                          {o.label}
-                        </button>
-                      ))}
-                    </div>
+              {/* Slippage selector */}
+              {selectedTokens.length > 0 && (
+                <div className="flex items-center gap-3 bg-white/[0.02] p-2 rounded-2xl border border-white/5">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter ml-1">الانزلاق:</span>
+                  <div className="flex gap-1 flex-1">
+                    {SLIPPAGE_OPTIONS.map((o) => (
+                      <button
+                        key={o.bps}
+                        onClick={() => onSlippageChange(o.bps)}
+                        className={`flex-1 text-[11px] font-black py-1.5 rounded-xl border transition-all duration-300 ${
+                          slippageBps === o.bps
+                            ? "border-base-blue/40 bg-base-blue/10 text-base-blue shadow-[0_0_15px_rgba(0,82,255,0.15)]"
+                            : "border-transparent text-slate-500 hover:bg-white/5"
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
                   </div>
-                )}
-              </>
-            )}
+                </div>
+              )}
+            </>
+          )}
 
-            {/* ─── Action Button ────────────────────────────────────────────── */}
-            <button
-              onClick={btn.isReset ? onReset : onExecute}
-              disabled={btn.disabled}
-              className={`group w-full py-5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100 ${btnClass}`}
-            >
-              <div className="flex items-center justify-center gap-3">
-                {(btn as { loading?: boolean }).loading && (
-                  <div className="w-4 h-4 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                )}
-                <span className="group-hover:tracking-[0.2em] transition-all duration-300">{btn.text}</span>
-              </div>
-            </button>
-          </div>
-        )}
+          {/* ─── Action Button ────────────────────────────────────────────── */}
+          <button
+            onClick={btn.isReset ? onReset : onExecute}
+            disabled={btn.disabled}
+            className={`group w-full py-5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100 ${btnClass}`}
+          >
+            <div className="flex items-center justify-center gap-3">
+              {(btn as { loading?: boolean }).loading && (
+                <div className="w-4 h-4 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+              )}
+              <span className="group-hover:tracking-[0.2em] transition-all duration-300">{btn.text}</span>
+            </div>
+          </button>
+        </div>
 
         <div className="text-[10px] font-bold text-center text-slate-600 flex items-center justify-center gap-2 uppercase tracking-tight">
           <span>{feePercent}% رسوم</span>
