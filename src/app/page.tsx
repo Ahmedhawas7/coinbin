@@ -20,14 +20,13 @@ import { useSweep } from "@/hooks/useSweep";
 import { TokenRow } from "@/components/TokenRow";
 import { SweepPanel } from "@/components/SweepPanel";
 import { StatsBar } from "@/components/StatsBar";
-import { ReferralCard } from "@/components/ReferralCard";
 import { PostSweepModal } from "@/components/PostSweepModal";
 import { saveReferrer, getReferrerFromURL, getActiveReferrer } from "@/lib/referral";
 import { executeBurn } from "@/lib/sweep";
 import { useWalletClient } from "wagmi";
 import Link from "next/link";
 
-type FilterType = "all" | "dust" | "high" | "nonzero" | "dead";
+type FilterType = "all" | "dust" | "nonzero" | "dead";
 
 export default function HomePage() {
   const { address, isConnected } = useAccount();
@@ -42,6 +41,7 @@ export default function HomePage() {
   const [showPostModal, setShowPostModal] = useState(false);
   const [isBurningDead, setIsBurningDead] = useState(false);
   const [referrer, setReferrer] = useState<`0x${string}` | undefined>(undefined);
+  const [hasAutoSelected, setHasAutoSelected] = useState(false);
 
   const { state: sweepState, classify, execute, reset } = useSweep();
 
@@ -60,6 +60,17 @@ export default function HomePage() {
     }
   }, [sweepState.status]);
 
+  // AUTO-SELECT DUST AND DEAD TOKENS ON FIRST LOAD
+  useEffect(() => {
+    if (!loading && tokens.length > 0 && !hasAutoSelected && isConnected) {
+      const toSelect = tokens.filter(t => (t.usdValue < 1 || t.usdValue === 0) && t.canSell);
+      if (toSelect.length > 0) {
+        setSelected(new Set(toSelect.map(t => t.address)));
+      }
+      setHasAutoSelected(true);
+    }
+  }, [loading, tokens, hasAutoSelected, isConnected]);
+
   // ─── Filtered token list ─────────────────────────────────────────────────
   const filteredTokens = useMemo(() => {
     let list = [...tokens];
@@ -73,7 +84,6 @@ export default function HomePage() {
       );
     }
     if (filter === "dust")   list = list.filter((t) => t.usdValue > 0 && t.usdValue < 1);
-    if (filter === "high")   list = list.filter((t) => t.usdValue >= 10);
     if (filter === "nonzero") list = list.filter((t) => t.usdValue > 0);
     if (filter === "dead")   list = list.filter((t) => t.balance > 0n && t.usdValue === 0);
     return list;
@@ -94,7 +104,6 @@ export default function HomePage() {
       else next.add(address);
       return next;
     });
-    // Reset sweep result when selection changes
     if (sweepState.sweepResult) reset();
   }, [sweepState.sweepResult, reset]);
 
@@ -117,29 +126,9 @@ export default function HomePage() {
     if (sweepState.sweepResult) reset();
   }, [filteredTokens, selected, sweepState.sweepResult, reset]);
 
-  const selectDustOnly = useCallback(() => {
-    const dust = tokens.filter((t) => t.usdValue > 0 && t.usdValue < 1 && t.canSell);
-    setSelected(new Set(dust.map((t) => t.address)));
-    if (sweepState.sweepResult) reset();
-  }, [tokens, sweepState.sweepResult, reset]);
-
-  // ─── Auto-classify on selection change ─────────────────────────────────
-  const handleAutoClassify = useCallback(async () => {
-    if (selectedTokens.length === 0) return;
-    const tokensToProcess = selectedTokens.map((t) => ({
-      address: t.address,
-      symbol: t.symbol,
-      balance: t.balance,
-      decimals: t.decimals,
-      usdValue: t.usdValue,
-    }));
-    await classify(tokensToProcess, slippageBps, referrer);
-  }, [selectedTokens, slippageBps, classify, referrer]);
-
   // ─── Execute sweep ───────────────────────────────────────────────────────
   const handleSweep = useCallback(async () => {
     if (sweepState.status === "error") { reset(); return; }
-
     const tokensToProcess = selectedTokens.map((t) => ({
       address: t.address,
       symbol: t.symbol,
@@ -147,12 +136,10 @@ export default function HomePage() {
       decimals: t.decimals,
       usdValue: t.usdValue,
     }));
-
     if (!sweepState.sweepResult) {
-      await classify(tokensToProcess, slippageBps, referrer);
+      await classify(tokensToProcess, slippageBps, referrer as `0x${string}`);
       return;
     }
-
     await execute(sweepState.sweepResult, slippageBps);
   }, [selectedTokens, slippageBps, classify, execute, sweepState, reset, referrer]);
 
@@ -181,7 +168,6 @@ export default function HomePage() {
       }));
       await executeBurn(walletClient, deadQuotes, address);
       await refetch();
-      setShowPostModal(false);
     } catch { /* ignore */ }
     finally { setIsBurningDead(false); }
   }, [walletClient, address, deadTokens, refetch]);
@@ -190,54 +176,38 @@ export default function HomePage() {
     filteredTokens.filter((t) => t.canSell).length > 0 &&
     filteredTokens.filter((t) => t.canSell).every((t) => selected.has(t.address));
 
-  // ─── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-bg-primary text-white selection:bg-base-blue/30 selection:text-white">
+    <div className="min-h-screen bg-bg-primary text-white selection:bg-base-blue/30 selection:text-white pb-20">
       <div className="mesh-gradient" />
 
-      {/* ─── Header ─────────────────────────────────────────────────────── */}
-      <header className="border-b border-white/5 bg-black/40 backdrop-blur-xl sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
-          {/* Brand */}
-          <div className="flex items-center gap-4 group cursor-pointer">
-            <div className="w-11 h-11 rounded-2xl bg-base-blue flex items-center justify-center shadow-[0_0_20px_rgba(0,82,255,0.3)] group-hover:scale-110 transition-transform duration-500">
-              <svg width="22" height="22" viewBox="0 0 18 18" fill="none">
-                <circle cx="9" cy="9" r="8" fill="white" opacity="0.15" />
-                <path d="M9 2C5.134 2 2 5.134 2 9C2 12.866 5.134 16 9 16C12.866 16 16 12.866 16 9C16 5.134 12.866 2 9 2ZM9 14C6.243 14 4 11.757 4 9C4 6.243 6.243 4 9 4C11.757 4 14 6.243 14 9C14 11.757 11.757 14 9 14Z" fill="white" />
-                <circle cx="9" cy="9" r="2.5" fill="white" />
-              </svg>
+      {/* ─── Compact Header ────────────────────────────────────────────── */}
+      <header className="border-b border-white/5 bg-black/60 backdrop-blur-2xl sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3 group cursor-pointer" onClick={() => window.location.reload()}>
+            <div className="w-8 h-8 rounded-xl bg-base-blue flex items-center justify-center shadow-lg shadow-base-blue/20">
+              🗑️
             </div>
-            <div className="hidden sm:block">
-              <div className="text-xl font-black tracking-tighter text-white leading-none">CoinBin <span className="text-base-blue">🗑️</span></div>
-              <div className="text-[11px] font-bold text-slate-500 mt-1 uppercase tracking-widest">Base Cleaner</div>
-            </div>
+            <span className="text-lg font-black tracking-tighter text-white">CoinBin</span>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-500/5 border border-emerald-500/10">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 status-pulse" />
-              <span className="text-[11px] font-black text-emerald-400 uppercase tracking-widest">Base Network</span>
-            </div>
-            <Link
-              href="/dashboard"
-              className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl border border-white/5 bg-white/[0.02] text-[11px] font-bold text-slate-400 hover:text-white hover:border-white/10 hover:bg-white/[0.05] transition-all"
-            >
-              📊 DASHBOARD
-            </Link>
-
-            <div className="h-8 w-[1px] bg-white/5 mx-2" />
-
+          <div className="flex items-center gap-6">
+            {isConnected && (
+              <div className="hidden md:flex items-center gap-4 text-[11px] font-black uppercase tracking-widest text-slate-500">
+                <Link href="/dashboard" className="hover:text-base-blue transition-colors">Analytics</Link>
+                <div className="w-[1px] h-3 bg-white/10" />
+                <span>Base Mainnet</span>
+              </div>
+            )}
             <Wallet>
-              <ConnectWallet className="!bg-base-blue !text-white !rounded-2xl !text-sm !px-6 !py-2.5 hover:!bg-[#0041CC] transition-all font-black uppercase tracking-widest shadow-[0_0_20px_rgba(0,82,255,0.2)]">
-                <Avatar className="h-6 w-6" />
-                <Name />
+              <ConnectWallet className="!bg-base-blue !text-white !rounded-xl !text-[11px] !px-4 !py-2 hover:!bg-[#0041CC] transition-all font-black uppercase tracking-widest shadow-lg shadow-base-blue/10">
+                <Avatar className="h-5 w-5" />
+                <Name className="!text-white" />
               </ConnectWallet>
               <WalletDropdown>
                 <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
                   <Avatar />
                   <Name />
                   <Address className="text-slate-400" />
-                  <EthBalance />
                 </Identity>
                 <WalletDropdownDisconnect className="text-red-400 hover:bg-red-500/10" />
               </WalletDropdown>
@@ -246,60 +216,21 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* ─── Main Content ────────────────────────────────────────────────── */}
-      <main className="max-w-6xl mx-auto px-6 py-12">
+      <main className="max-w-7xl mx-auto px-6 py-8">
         {!isConnected ? (
-          /* ─── Hero / Not Connected ────────────────────────────────── */
-          <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in-up">
-
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-base-blue/5 border border-base-blue/10 text-[11px] font-black text-base-blue uppercase tracking-[0.2em] mb-8">
-              ✨ THE #1 BASE SWEEPER
-            </div>
-
-            <h1 className="text-6xl md:text-7xl font-black text-white mb-6 leading-[0.9] tracking-tighter">
-              نظّف محفظتك <br />
-              <span className="text-gradient">واستلم USDC</span>
+          <div className="flex flex-col items-center justify-center py-32 text-center animate-in fade-in slide-in-from-bottom-8 duration-700">
+            <h1 className="text-5xl md:text-7xl font-black text-white mb-6 leading-tight tracking-tighter">
+              نظّف محفظتك واستلم <span className="text-base-blue">USDC</span>
             </h1>
-            
-            <p className="text-slate-500 text-lg mb-12 max-w-xl leading-relaxed font-medium">
-              اكتشف جميع توكناتك على شبكة Base بضغطة واحدة. بيع العملات دفعة واحدة بأفضل الأسعار المباشرة، أو احرق العملات الميتة لتنظيف محفظتك تماماً.
+            <p className="text-slate-500 text-lg mb-12 max-w-xl font-medium">
+              الخيار الأول في Base لبيع وحرق العملات الميتة بضغطة واحدة.
             </p>
-
-            <div className="flex flex-col sm:flex-row items-center gap-4 mb-16">
-              <Wallet>
-                <ConnectWallet className="!bg-base-blue !text-white !rounded-2xl !text-lg !px-12 !py-6 hover:!bg-[#0041CC] transition-all font-black uppercase tracking-widest shadow-[0_0_40px_rgba(0,82,255,0.35)] active:scale-95">
-                  <span>ربط المحفظة للبدء</span>
-                </ConnectWallet>
-              </Wallet>
-              <Link href="https://docs.base.org" target="_blank" className="px-10 py-5 rounded-2xl bg-white/[0.03] border border-white/5 font-black text-sm text-slate-400 hover:text-white hover:bg-white/[0.07] transition-all uppercase tracking-widest">
-                كيف يعمل؟
-              </Link>
-            </div>
-
-            {/* Features Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-3xl">
-              {[
-                { icon: "⚡", title: "اكتشاف فوري", desc: "فحص شامل لمحفظتك بحثاً عن أي عملات" },
-                { icon: "💎", title: "أسعار حقيقية", desc: "ربط مباشر مع GeckoTerminal وUniswap" },
-                { icon: "🔒", title: "آمن وشفاف", desc: "تحكم كامل في موافقات العملات قبل البيع" },
-              ].map((f, i) => (
-                <div key={i} className="glass-card rounded-3xl p-8 text-center group">
-                  <div className="text-4xl mb-4 group-hover:scale-125 transition-transform duration-500">{f.icon}</div>
-                  <div className="text-sm font-black text-white mb-2 uppercase tracking-wide">{f.title}</div>
-                  <div className="text-xs font-medium text-slate-500 leading-relaxed">{f.desc}</div>
-                </div>
-              ))}
-            </div>
-            
-            <div className="mt-16 pt-8 border-t border-white/5 w-full max-w-lg flex items-center justify-around opacity-40">
-              <img src="https://avatars.githubusercontent.com/u/108554348?v=4" className="h-6 grayscale hover:grayscale-0 transition-all" alt="Base" title="Built on Base" />
-              <img src="https://uniswap.org/favicon.png" className="h-6 grayscale hover:grayscale-0 transition-all" alt="Uniswap" title="Powered by Uniswap" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Verified Contracts</span>
-            </div>
+            <Wallet>
+              <ConnectWallet className="!bg-base-blue !text-white !rounded-2xl !text-lg !px-12 !py-6 hover:!bg-base-blue/90 shadow-2xl shadow-base-blue/20 active:scale-95 transition-all font-black uppercase tracking-widest" />
+            </Wallet>
           </div>
         ) : (
-          /* ─── Dashboard ───────────────────────────────────── */
-          <div className="animate-fade-in">
+          <div className="space-y-8 animate-in fade-in duration-500">
             <StatsBar
               totalValue={totalUSDValue}
               tokenCount={tokens.filter((t) => t.canSell).length}
@@ -310,139 +241,87 @@ export default function HomePage() {
               loading={loading}
             />
 
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-10">
-              {/* ─── Token List ─────────────────────────────────────────── */}
-              <div className="min-w-0">
-                {/* Search and Filters Header */}
-                <div className="glass-card rounded-3xl p-4 mb-6 flex flex-col md:flex-row gap-4 items-center justify-between border-white/[0.03]">
-                  <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto no-scrollbar pb-2 md:pb-0">
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8 items-start">
+              {/* Token List Section */}
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white/[0.02] border border-white/5 rounded-[2rem] p-3 backdrop-blur-md">
+                   <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full sm:w-auto p-1">
                     <button
                       onClick={toggleAll}
-                      className={`text-[11px] font-black px-4 py-2.5 rounded-xl border transition-all whitespace-nowrap uppercase tracking-widest ${
-                        allSellableSelected ? "bg-red-500/10 border-red-500/20 text-red-400" : "bg-white/[0.03] border-white/5 text-slate-400 hover:text-white hover:border-white/10"
+                      className={`text-[10px] font-black px-4 py-2 rounded-xl transition-all uppercase tracking-widest border ${
+                        allSellableSelected ? "bg-red-500/10 border-red-500/20 text-red-500" : "bg-white/5 border-transparent text-slate-400 hover:text-white"
                       }`}
                     >
                       {allSellableSelected ? "إلغاء التحديد" : "تحديد الكل"}
                     </button>
-                    <div className="w-[1px] h-6 bg-white/5 mx-1" />
                     {(["all", "dust", "nonzero", "dead"] as FilterType[]).map((f) => (
                       <button
                         key={f}
                         onClick={() => setFilter(f)}
-                        className={`text-[11px] font-black px-4 py-2.5 rounded-xl border transition-all whitespace-nowrap uppercase tracking-widest ${
+                        className={`text-[10px] font-black px-4 py-2 rounded-xl transition-all uppercase tracking-widest whitespace-nowrap border ${
                           filter === f
-                            ? "bg-base-blue/10 border-base-blue/20 text-base-blue glow-accent"
-                            : "bg-white/[0.03] border-white/5 text-slate-500 hover:text-slate-300"
+                            ? "bg-base-blue/10 border-base-blue/20 text-base-blue"
+                            : "bg-transparent border-transparent text-slate-500 hover:text-slate-300"
                         }`}
                       >
-                        {f === "all" ? "الكل" : f === "dust" ? `غبار (${dustTokens.length})` : f === "nonzero" ? "أرصدة" : `ميت 🔥 (${deadTokens.length})`}
+                        {f === "all" ? "الكل" : f === "dust" ? `غبار (${dustTokens.length})` : f === "nonzero" ? "أرصدة" : `ميت (${deadTokens.length})`}
                       </button>
                     ))}
                   </div>
-                  
-                  <div className="relative w-full md:w-64 group">
-                    <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-600 group-focus-within:text-base-blue transition-colors">
-                      <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                    </div>
+
+                  <div className="relative w-full sm:w-64">
                     <input
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      placeholder="بحث عن رمز..."
-                      className="w-full text-xs font-bold py-3 pr-10 pl-4 rounded-xl glass-card border-white/5 bg-transparent focus:outline-none focus:border-base-blue/30 transition-all placeholder:text-slate-700"
+                      placeholder="بحث..."
+                      className="w-full text-[11px] font-bold py-2.5 pr-10 pl-4 rounded-xl bg-black/20 border border-white/5 focus:border-base-blue/30 outline-none transition-all placeholder:text-slate-700"
                     />
+                    <div className="absolute inset-y-0 right-3 flex items-center text-slate-700">
+                      🔍
+                    </div>
                   </div>
                 </div>
 
-                {/* Table Container */}
-                <div className="glass rounded-[2rem] border border-white/10 overflow-hidden glow-accent/5">
-                  {error ? (
-                    <div className="p-16 text-center space-y-4">
-                      <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto text-2xl border border-red-500/20">⚠️</div>
-                      <div className="space-y-1">
-                        <div className="text-sm font-black text-white uppercase tracking-wider">خطأ في مزامنة البيانات</div>
-                        <div className="text-xs text-slate-500 max-w-xs mx-auto break-words">{error}</div>
-                      </div>
-                      <button onClick={refetch} className="px-6 py-2.5 rounded-xl bg-base-blue/10 text-base-blue font-black text-[11px] uppercase tracking-widest hover:bg-base-blue/20 transition-all">
-                        إعادة المحاولة
-                      </button>
+                <div className="glass rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl">
+                  {loading ? (
+                    <div className="p-32 text-center">
+                      <div className="w-12 h-12 border-4 border-base-blue/20 border-t-base-blue rounded-full animate-spin mx-auto mb-4" />
+                      <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest animate-pulse">Scanning Wallet...</p>
                     </div>
-                  ) : loading ? (
-                    <div className="p-20 text-center space-y-6">
-                      <div className="relative w-16 h-16 mx-auto">
-                        <div className="absolute inset-0 border-4 border-white/5 rounded-full" />
-                        <div className="absolute inset-0 border-4 border-base-blue rounded-full border-t-transparent animate-spin" />
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-sm font-black text-white uppercase tracking-widest animate-pulse">Scanning Base...</div>
-                        <div className="text-[11px] font-bold text-slate-600">نقوم بفحص جميع محافظ الهوية والتوكنات الخاصة بك</div>
-                      </div>
+                  ) : filteredTokens.length === 0 ? (
+                    <div className="py-32 text-center">
+                      <p className="text-4xl mb-4">🔍</p>
+                      <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">لا توجد عملات مطابقة</p>
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full border-collapse">
+                      <table className="w-full text-right border-collapse">
                         <thead>
-                          <tr className="border-b border-white/5 bg-white/[0.01]">
-                            <th className="w-12 pl-6 py-4" />
-                            <th className="text-[10px] font-black text-slate-500 text-right uppercase tracking-[0.2em] py-4 pr-3">الرمز</th>
-                            <th className="text-[10px] font-black text-slate-500 text-right uppercase tracking-[0.2em] py-4">الرصيد</th>
-                            <th className="text-[10px] font-black text-slate-500 text-right uppercase tracking-[0.2em] py-4">السعر المباشر</th>
-                            <th className="text-[10px] font-black text-slate-500 text-right uppercase tracking-[0.2em] py-4 pr-6">القيمة التقريبية</th>
+                          <tr className="bg-white/[0.02] border-b border-white/5">
+                            <th className="w-14 pl-6 py-5" />
+                            <th className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] py-5">الرمز</th>
+                            <th className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] py-5">الرصيد</th>
+                            <th className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] py-5">القيمة</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-white/[0.02]">
-                          {filteredTokens.length === 0 ? (
-                            <tr>
-                              <td colSpan={5} className="py-24 text-center opacity-40">
-                                <div className="text-5xl mb-4">🔍</div>
-                                <div className="text-xs font-black uppercase tracking-widest">لا توجد نتائج</div>
-                              </td>
-                            </tr>
-                          ) : (
-                            filteredTokens.map((token) => (
-                              <TokenRow
-                                key={token.address}
-                                token={token}
-                                selected={selected.has(token.address)}
-                                onToggle={() => toggleToken(token.address)}
-                              />
-                            ))
-                          )}
+                          {filteredTokens.map((token) => (
+                            <TokenRow
+                              key={token.address}
+                              token={token}
+                              selected={selected.has(token.address)}
+                              onToggle={() => toggleToken(token.address)}
+                            />
+                          ))}
                         </tbody>
                       </table>
                     </div>
                   )}
                 </div>
-
-                {/* Footer Stats/Actions */}
-                <div className="mt-6 flex items-center justify-between px-2">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1.5 opacity-60">
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{tokens.length} عملة مكتشفة</span>
-                    </div>
-                    {selected.size > 0 && (
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-base-blue animate-pulse" />
-                        <span className="text-[10px] font-black text-base-blue uppercase tracking-widest">{selected.size} محدد</span>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={refetch}
-                    disabled={loading}
-                    className="flex items-center gap-2 group text-[10px] font-black text-slate-500 hover:text-white uppercase tracking-widest transition-colors"
-                  >
-                    <svg className={`group-hover:rotate-180 transition-transform duration-500 ${loading ? 'animate-spin' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                      <path d="M23 4v6h-6" /><path d="M1 20v-6h6" />
-                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                    </svg>
-                    تحديث القائمة
-                  </button>
-                </div>
               </div>
 
-              {/* ─── Sidebar ─────────────────────────────────────────── */}
-              <aside className="space-y-6">
+              {/* Sidebar Panel */}
+              <aside className="sticky top-24 space-y-6">
                 <SweepPanel
                   selectedTokens={selectedTokens}
                   slippageBps={slippageBps}
@@ -451,54 +330,33 @@ export default function HomePage() {
                   onExecute={handleSweep}
                   onReset={handleReset}
                   isConnected={isConnected}
-                  onAutoClassify={handleAutoClassify}
                 />
                 
-                <ReferralCard />
-
-                <div className="glass-card rounded-3xl p-6 border-white/[0.03]">
-                  <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-4">💡 تعليمات سريعة</h4>
-                  <ul className="space-y-3">
-                    {[
-                      "اختر العملات التي تريد بيعها من القائمة",
-                      "سيتم فحص السيولة تلقائياً لكل عملة",
-                      "تأكد من الموافقة على كل عملة في محفظتك",
-                      "العملات بدون سيولة ستوجّه تلقائياً للحرق"
-                    ].map((step, i) => (
-                      <li key={i} className="flex gap-3 text-[11px] font-bold text-slate-500 leading-tight">
-                        <span className="text-base-blue opacity-50">{i+1}.</span>
-                        {step}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                {deadTokens.length > 0 && (
+                  <div className="glass-card rounded-3xl p-6 border-orange-500/10 group">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-[11px] font-black text-orange-500 uppercase tracking-widest">تحذير من عملات ميتة 🔥</h4>
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-orange-500/10 text-orange-400">{deadTokens.length}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-bold mb-6 leading-relaxed">
+                      هذه العملات ليس لها سيولة حالياً. يمكنك التخلص منها تماماً لتنظيف محفظتك.
+                    </p>
+                    <button 
+                      onClick={handleBurnDead}
+                      disabled={isBurningDead}
+                      className="w-full py-4 rounded-2xl bg-orange-600/10 border border-orange-500/20 text-orange-500 text-[11px] font-black uppercase tracking-widest hover:bg-orange-600 hover:text-white transition-all active:scale-95 disabled:opacity-50"
+                    >
+                      {isBurningDead ? "جارٍ الحرق..." : "حرق جميع العملات الميتة 🔥"}
+                    </button>
+                  </div>
+                )}
               </aside>
             </div>
           </div>
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-white/5 bg-black/40 backdrop-blur-xl py-12">
-        <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-             <div className="text-sm font-black text-white uppercase tracking-tighter">CoinBin <span className="text-base-blue">🗑️</span></div>
-             <div className="w-[1px] h-4 bg-white/10" />
-             <div className="text-[10px] font-bold text-slate-600">The first multi-token sweeper for Base</div>
-          </div>
-          
-          <div className="flex items-center gap-8 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-            <a href="https://base.org" className="hover:text-base-blue transition-colors">Base Ecosystem</a>
-            <a href="https://uniswap.org" className="hover:text-[#FF007A] transition-colors">Uniswap V3</a>
-          </div>
-          
-          <div className="text-[9px] font-bold text-slate-700 max-w-[200px] text-center md:text-left leading-relaxed">
-            استخدم بمسؤولية. لا نقوم بتخزين أي مفاتيح خاصة. جميع المعاملات تتم عبر عقود ذكية مفتوحة المصدر.
-          </div>
-        </div>
-      </footer>
-
-      {/* ─── Post-Sweep Modal ────────────────────────────────────────────── */}
+      {/* Post Sweep Modal */}
       {showPostModal && sweepState.status === "success" && (
         <PostSweepModal
           receivedUSDC={sweepState.formattedUserReceives}

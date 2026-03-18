@@ -9,7 +9,7 @@ import { useAccount } from "wagmi";
 interface PostSweepModalProps {
   receivedUSDC: string;
   deadTokens: TokenBalance[];
-  sellTxHash?: `0x${string}`;
+  sellTxHash?: string;
   onBurnDead: () => void;
   onClose: () => void;
   isBurning?: boolean;
