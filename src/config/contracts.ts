@@ -26,6 +26,7 @@ export const MIN_SWAP_VALUE_USDC = BigInt(1); // $0.000001
 // ─── Uniswap V3 on Base ───────────────────────────────────────────────────────
 export const UNISWAP_V3_ROUTER = "0x2626664c2603336E57B271c5C0b26F421741e481" as const;
 export const UNISWAP_V3_QUOTER = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a" as const;
+export const AERODROME_ROUTER  = "0x9401518c4cc1ee5021bc4b2a3333f2402bd099c1" as const;
 
 // ─── Key Token Addresses on Base ─────────────────────────────────────────────
 export const TOKENS = {
@@ -162,6 +163,49 @@ export const QUOTER_ABI = [
       { name: "initializedTicksCrossed", type: "uint32" },
       { name: "gasEstimate", type: "uint256" },
     ],
+  },
+] as const;
+
+// ─── Aerodrome Router ABI (Velodrome fork — used for most Base tokens) ───────
+export const AERODROME_ROUTER_ABI = [
+  {
+    name: "getAmountsOut",
+    type: "function",
+    stateMutability: "view",
+    inputs: [
+      { name: "amountIn", type: "uint256" },
+      {
+        name: "routes",
+        type: "tuple[]",
+        components: [
+          { name: "from", type: "address" },
+          { name: "to", type: "address" },
+          { name: "stable", type: "bool" },
+        ],
+      },
+    ],
+    outputs: [{ name: "amounts", type: "uint256[]" }],
+  },
+  {
+    name: "swapExactTokensForTokens",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "amountIn", type: "uint256" },
+      { name: "amountOutMin", type: "uint256" },
+      {
+        name: "routes",
+        type: "tuple[]",
+        components: [
+          { name: "from", type: "address" },
+          { name: "to", type: "address" },
+          { name: "stable", type: "bool" },
+        ],
+      },
+      { name: "to", type: "address" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [{ name: "amounts", type: "uint256[]" }],
   },
 ] as const;
 

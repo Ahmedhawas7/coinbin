@@ -8,6 +8,9 @@ import {
   MULTICALL3_ADDRESS,
   MULTICALL3_ABI,
   ERC20_ABI,
+  AERODROME_ROUTER,
+  AERODROME_ROUTER_ABI,
+  TOKENS,
 } from "@/config/contracts";
 import { KNOWN_TOKENS, UNSELLABLE, type TokenInfo } from "@/lib/tokens";
 import { encodeFunctionData, decodeFunctionResult, type Address } from "viem";
@@ -17,6 +20,7 @@ export interface TokenBalance extends TokenInfo {
   balanceFormatted: number;
   usdPrice: number;
   usdValue: number;
+  logoUrl?: string;
   canSell: boolean;
   isUnknown?: boolean; // discovered dynamically
 }
@@ -156,7 +160,7 @@ export function useTokenBalances() {
       // ─── 3. Fetch USD prices from GeckoTerminal (Best for Base Tokens) ──
       const tokenAddresses = tokenList.map((t) => t.address.toLowerCase()).join(",");
 
-      let prices: Record<string, { price: number }> = {};
+      let prices: Record<string, { price: number; logoUrl?: string }> = {};
       
       // a) Try GeckoTerminal first
       if (tokenAddresses) {
@@ -170,6 +174,7 @@ export function useTokenBalances() {
               const addr = item.attributes.address.toLowerCase();
               prices[addr] = {
                 price: parseFloat(item.attributes.price_usd || "0"),
+                logoUrl: item.attributes.image_url,
               };
             });
           }
@@ -178,24 +183,80 @@ export function useTokenBalances() {
         }
       }
 
-      // b) Fallback to LlamaPrice for missing prices
-      const missingAddresses = tokenList
-        .filter(t => !prices[t.address.toLowerCase()] || prices[t.address.toLowerCase()].price === 0)
-        .map(t => `base:${t.address.toLowerCase()}`)
-        .join(",");
-
-      if (missingAddresses) {
+      // c) Final Fallback: Aerodrome Multicall (Direct DEX check)
+      const stillMissing = tokenList.filter(t => !prices[t.address.toLowerCase()] || prices[t.address.toLowerCase()].price === 0);
+      
+      if (stillMissing.length > 0) {
         try {
-          const llamaRes = await fetch(`https://coins.llama.fi/prices/current/${missingAddresses}`);
-          if (llamaRes.ok) {
-            const llamaData = await llamaRes.json();
-            Object.entries(llamaData.coins || {}).forEach(([key, val]: [string, any]) => {
-              const addr = key.split(":")[1].toLowerCase();
-              prices[addr] = { price: val.price || 0 };
+          // Prepare multicall for Aerodrome: [Direct Route, WETH Route]
+          const aeroCalls: any[] = [];
+          
+          stillMissing.forEach(t => {
+            const amountIn = BigInt(Math.pow(10, t.decimals)); // 1.0 token
+            
+            // Route 1: Direct
+            aeroCalls.push({
+              target: AERODROME_ROUTER,
+              allowFailure: true,
+              callData: encodeFunctionData({
+                abi: AERODROME_ROUTER_ABI,
+                functionName: "getAmountsOut",
+                args: [amountIn, [{ from: t.address, to: TOKENS.USDC, stable: false }]],
+              }),
             });
-          }
+
+            // Route 2: WETH Routed
+            aeroCalls.push({
+              target: AERODROME_ROUTER,
+              allowFailure: true,
+              callData: encodeFunctionData({
+                abi: AERODROME_ROUTER_ABI,
+                functionName: "getAmountsOut",
+                args: [amountIn, [
+                  { from: t.address, to: TOKENS.WETH, stable: false },
+                  { from: TOKENS.WETH, to: TOKENS.USDC, stable: false }
+                ]],
+              }),
+            });
+          });
+
+          const aeroResults = await publicClient.readContract({
+            address: MULTICALL3_ADDRESS,
+            abi: MULTICALL3_ABI,
+            functionName: "aggregate3",
+            args: [aeroCalls],
+          }) as any[];
+
+          stillMissing.forEach((t, i) => {
+            const directRes = aeroResults[i * 2];
+            const routedRes = aeroResults[i * 2 + 1];
+            
+            let bestPrice = 0;
+
+            const decodeAero = (res: any) => {
+              if (!res?.success) return 0;
+              try {
+                const decoded = decodeFunctionResult({
+                  abi: AERODROME_ROUTER_ABI,
+                  functionName: "getAmountsOut",
+                  data: res.returnData,
+                }) as bigint[];
+                const out = decoded[decoded.length - 1];
+                // USDC has 6 decimals, so price = out / 1e6
+                return Number(out) / 1e6;
+              } catch { return 0; }
+            };
+
+            const p1 = decodeAero(directRes);
+            const p2 = decodeAero(routedRes);
+            bestPrice = Math.max(p1, p2);
+
+            if (bestPrice > 0) {
+              prices[t.address.toLowerCase()] = { price: bestPrice };
+            }
+          });
         } catch (err) {
-          console.error("LlamaPrice fallback failed:", err);
+          console.error("Aerodrome Multicall fallback failed:", err);
         }
       }
 
@@ -224,9 +285,11 @@ export function useTokenBalances() {
 
         const balanceFormatted = Number(balance) / Math.pow(10, token.decimals);
         
-        // Get price from GeckoTerminal map
-        const usdPrice = prices[token.address.toLowerCase()]?.price || 0;
+        // Get price and logo from GeckoTerminal map (or fallback)
+        const geckoData = prices[token.address.toLowerCase()];
+        const usdPrice = geckoData?.price || 0;
         const usdValue = balanceFormatted * usdPrice;
+        const logoUrl = geckoData?.logoUrl || `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/base/assets/${token.address}/logo.png`;
 
         tokenBalances.push({
           ...token,
@@ -234,6 +297,7 @@ export function useTokenBalances() {
           balanceFormatted,
           usdPrice,
           usdValue,
+          logoUrl,
           canSell: !UNSELLABLE.has(token.address.toLowerCase()),
         });
       });
@@ -260,8 +324,8 @@ export function useTokenBalances() {
   const dustTokens = tokens.filter(
     (t) => t.usdValue < 1 && t.usdValue > 0 && t.canSell
   );
-  const deadTokens = tokens.filter(
-    (t) => t.usdValue === 0 && t.balance > 0n
+  const unpricedTokens = tokens.filter(
+    (t) => t.usdValue === 0 && t.balance > 0n && t.canSell
   );
 
   return {
@@ -271,6 +335,7 @@ export function useTokenBalances() {
     refetch: fetchBalances,
     totalUSDValue,
     dustTokens,
-    deadTokens,
+    unpricedTokens,
+    deadTokens: unpricedTokens, // keep for backward compat or just use unpriced
   };
 }

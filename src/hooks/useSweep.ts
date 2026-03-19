@@ -91,7 +91,7 @@ export function useSweep() {
     async (tokens: TokenToProcess[], slippageBps: number, referrer?: Address) => {
       if (!publicClient || !address) return null;
 
-      patch({ status: "classifying", currentStep: "🔍 تحليل السيولة عبر 0x Aggregator..." });
+      patch({ status: "classifying", currentStep: "🔍 Scanning 0x + Aerodrome + Uniswap..." });
 
       try {
         const result = await classifyTokens(publicClient, tokens, slippageBps, address, referrer);

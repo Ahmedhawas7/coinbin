@@ -15,12 +15,17 @@ import {
 } from "viem";
 import {
   UNISWAP_V3_ROUTER,
+  UNISWAP_V3_QUOTER,
+  QUOTER_ABI,
+  SWAP_ROUTER_ABI,
   TOKENS,
   ERC20_ABI,
   FEE_RECIPIENT,
   PROTOCOL_FEE_BPS,
   BURN_ADDRESS,
   MIN_SWAP_VALUE_USDC,
+  AERODROME_ROUTER,
+  AERODROME_ROUTER_ABI,
 } from "@/config/contracts";
 import { splitFee } from "@/lib/referral";
 import { get0xQuote } from "@/lib/zerox";
@@ -93,48 +98,183 @@ export async function classifyTokens(
       try {
         const amountAfterFee = token.balance - (token.balance * PROTOCOL_FEE_BPS) / BigInt(10000);
         
-        // 0x Aggregator - Finds best price across all DEXs on Base
-        const quote = await get0xQuote(
-          token.address,
-          TOKENS.USDC,
-          amountAfterFee.toString(),
-          taker
-        );
-
-        const amountOut = BigInt(quote.buyAmount);
-
-        // Even if GeckoTerminal says 0, if 0x can find a route for > MIN, it's a sell!
-        if (amountOut === BigInt(0) || amountOut < MIN_SWAP_VALUE_USDC) {
-          burnQuotes.push({ token, action: "burn", amountIn: token.balance });
-          return;
+        // 1. Try 0x Aggregator (Best)
+        let quote: any;
+        try {
+          quote = await get0xQuote(
+            token.address,
+            TOKENS.USDC,
+            amountAfterFee.toString(),
+            taker
+          );
+          
+          if (quote && quote.buyAmount && BigInt(quote.buyAmount) >= MIN_SWAP_VALUE_USDC) {
+            const amountOut = BigInt(quote.buyAmount);
+            const totalFeeAmount = (amountOut * PROTOCOL_FEE_BPS) / BigInt(10000);
+            const { referrerBps, protocolBps } = splitFee(PROTOCOL_FEE_BPS, hasReferrer);
+            const protocolFee = (amountOut * protocolBps) / BigInt(10000);
+            const referrerFee = hasReferrer ? (amountOut * referrerBps) / BigInt(10000) : BigInt(0);
+            const userReceives = amountOut - totalFeeAmount;
+            
+            sellQuotes.push({
+              token,
+              action: "sell",
+              amountIn: token.balance,
+              estimatedOut: amountOut,
+              protocolFee,
+              referrerFee,
+              userReceives,
+              amountOutMinimum: BigInt(quote.minBuyAmount || 0),
+              tx: {
+                to: quote.to as Address,
+                data: quote.data as `0x${string}`,
+                value: BigInt(quote.value || 0),
+              },
+            });
+            return;
+          }
+        } catch (err) {
+          console.warn(`0x failed for ${token.symbol}, trying DEX fallbacks...`);
         }
 
-        const totalFeeAmount = (amountOut * PROTOCOL_FEE_BPS) / BigInt(10000);
-        const { referrerBps, protocolBps } = splitFee(PROTOCOL_FEE_BPS, hasReferrer);
+        // 2. Try Aerodrome (Base Native #1 DEX)
+        try {
+          // Routes to check: [Direct, WETH Routed]
+          const routeOptions = [
+            [{ from: token.address, to: TOKENS.USDC, stable: false }],
+            [
+              { from: token.address, to: TOKENS.WETH, stable: false },
+              { from: TOKENS.WETH, to: TOKENS.USDC, stable: false }
+            ]
+          ];
 
-        const protocolFee = (amountOut * protocolBps) / BigInt(10000);
-        const referrerFee = hasReferrer
-          ? (amountOut * referrerBps) / BigInt(10000)
-          : BigInt(0);
-        const userReceives = amountOut - totalFeeAmount;
-        
-        const amountOutMinimum = BigInt(quote.minBuyAmount || 0);
+          let bestAeroOut = BigInt(0);
+          let bestAeroRoute: any[] = [];
 
-        sellQuotes.push({
-          token,
-          action: "sell",
-          amountIn: token.balance,
-          estimatedOut: amountOut,
-          protocolFee,
-          referrerFee,
-          userReceives,
-          amountOutMinimum,
-          tx: {
-            to: quote.to as Address,
-            data: quote.data as `0x${string}`,
-            value: BigInt(quote.value || 0),
-          },
-        });
+          for (const routes of routeOptions) {
+            try {
+              const amounts = await publicClient.readContract({
+                address: AERODROME_ROUTER,
+                abi: AERODROME_ROUTER_ABI,
+                functionName: "getAmountsOut",
+                args: [amountAfterFee, routes],
+              });
+              const out = (amounts as bigint[])[(amounts as bigint[]).length - 1];
+              if (out > bestAeroOut) {
+                bestAeroOut = out;
+                bestAeroRoute = routes;
+              }
+            } catch {}
+          }
+
+          if (bestAeroOut >= MIN_SWAP_VALUE_USDC) {
+            const totalFeeAmount = (bestAeroOut * PROTOCOL_FEE_BPS) / BigInt(10000);
+            const { referrerBps, protocolBps } = splitFee(PROTOCOL_FEE_BPS, hasReferrer);
+            const protocolFee = (bestAeroOut * protocolBps) / BigInt(10000);
+            const referrerFee = hasReferrer ? (bestAeroOut * referrerBps) / BigInt(10000) : BigInt(0);
+            const userReceives = bestAeroOut - totalFeeAmount;
+
+            sellQuotes.push({
+              token,
+              action: "sell",
+              amountIn: token.balance,
+              estimatedOut: bestAeroOut,
+              protocolFee,
+              referrerFee,
+              userReceives,
+              amountOutMinimum: (bestAeroOut * BigInt(95)) / BigInt(100), // 5% slippage
+              tx: {
+                to: AERODROME_ROUTER,
+                data: encodeFunctionData({
+                  abi: AERODROME_ROUTER_ABI,
+                  functionName: "swapExactTokensForTokens",
+                  args: [
+                    amountAfterFee,
+                    (bestAeroOut * BigInt(95)) / BigInt(100),
+                    bestAeroRoute,
+                    taker,
+                    BigInt(Math.floor(Date.now() / 1000) + 1200), // 20 min deadline
+                  ],
+                }),
+                value: BigInt(0),
+              },
+            });
+            return;
+          }
+        } catch (aeroErr) {
+          console.warn(`Aerodrome fallback failed for ${token.symbol}`);
+        }
+
+        // 3. Try Uniswap V3 (Final DEX Fallback)
+        try {
+          const tiers = [3000, 10000, 500, 100];
+          let bestUniOut = BigInt(0);
+          let bestUniTier = 3000;
+
+          for (const tier of tiers) {
+            try {
+              const out = await publicClient.readContract({
+                address: UNISWAP_V3_QUOTER,
+                abi: QUOTER_ABI,
+                functionName: "quoteExactInputSingle",
+                args: [{
+                  tokenIn: token.address,
+                  tokenOut: TOKENS.USDC,
+                  amountIn: amountAfterFee,
+                  fee: tier,
+                  sqrtPriceLimitX96: BigInt(0),
+                }],
+              });
+              const amount = (out as any)[0] as bigint;
+              if (amount > bestUniOut) {
+                bestUniOut = amount;
+                bestUniTier = tier;
+              }
+            } catch {}
+          }
+
+          if (bestUniOut >= MIN_SWAP_VALUE_USDC) {
+            const totalFeeAmount = (bestUniOut * PROTOCOL_FEE_BPS) / BigInt(10000);
+            const { referrerBps, protocolBps } = splitFee(PROTOCOL_FEE_BPS, hasReferrer);
+            const protocolFee = (bestUniOut * protocolBps) / BigInt(10000);
+            const referrerFee = hasReferrer ? (bestUniOut * referrerBps) / BigInt(10000) : BigInt(0);
+            const userReceives = bestUniOut - totalFeeAmount;
+
+            sellQuotes.push({
+              token,
+              action: "sell",
+              amountIn: token.balance,
+              estimatedOut: bestUniOut,
+              protocolFee,
+              referrerFee,
+              userReceives,
+              amountOutMinimum: (bestUniOut * BigInt(95)) / BigInt(100),
+              tx: {
+                to: UNISWAP_V3_ROUTER,
+                data: encodeFunctionData({
+                  abi: SWAP_ROUTER_ABI,
+                  functionName: "exactInputSingle",
+                  args: [{
+                    tokenIn: token.address,
+                    tokenOut: TOKENS.USDC,
+                    fee: bestUniTier,
+                    recipient: taker,
+                    amountIn: amountAfterFee,
+                    amountOutMinimum: (bestUniOut * BigInt(95)) / BigInt(100),
+                    sqrtPriceLimitX96: BigInt(0),
+                  }],
+                }),
+                value: BigInt(0),
+              },
+            });
+            return;
+          }
+        } catch (uniErr) {
+          console.warn(`Uniswap V3 fallback failed for ${token.symbol}`);
+        }
+
+        // 4. If all fail, mark as burn
+        burnQuotes.push({ token, action: "burn", amountIn: token.balance });
       } catch (err) {
         // Log error but don't mark as burn if it's a known high-value token
         // If 0x fail for any reason, we assume it's a burn (no liquidity / unswappable)

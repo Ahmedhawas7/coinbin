@@ -1,9 +1,17 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-coinbase" });
+const jakarta = Plus_Jakarta_Sans({ 
+  subsets: ["latin"], 
+  variable: "--font-jakarta" 
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space"
+});
 
 export const metadata: Metadata = {
   title: "CoinBin 🗑️ — سلة الكوين | نظّف محفظتك على Base",
@@ -17,6 +25,20 @@ export const metadata: Metadata = {
   other: {
     "base:app_id": "697b0897748a9bde7c61ab55",
   },
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
+  manifest: "/manifest.json",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#050607",
 };
 
 export default function RootLayout({
@@ -25,9 +47,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ar" dir="rtl">
-      <body className={`${inter.variable} font-sans bg-base-dark text-white antialiased`}>
-        <Providers>{children}</Providers>
+    <html lang="ar" dir="rtl" className={`${jakarta.variable} ${spaceGrotesk.variable}`}>
+      <body className="font-sans bg-bg-primary text-white antialiased selection:bg-accent/30 selection:text-white">
+        <Providers>
+          <div className="mesh-gradient" />
+          {children}
+        </Providers>
       </body>
     </html>
   );

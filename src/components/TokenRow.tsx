@@ -1,6 +1,8 @@
 "use client";
 
 import { type TokenBalance } from "@/hooks/useTokenBalances";
+import { motion } from "framer-motion";
+import { useUI } from "@/context/UIContext";
 
 interface TokenRowProps {
   token: TokenBalance;
@@ -9,76 +11,104 @@ interface TokenRowProps {
 }
 
 export function TokenRow({ token, selected, onToggle }: TokenRowProps) {
+  const { t, isArabic } = useUI();
   const isUsdc = token.symbol === "USDC" || token.symbol === "USDbC";
   const hasValue = token.usdValue > 0;
-  const isPossiblyDead = token.balance > 0n && token.usdValue === 0 && !isUsdc;
+  const isUnpriced = token.balance > 0n && token.usdValue === 0 && !isUsdc;
 
   return (
-    <tr
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
       onClick={onToggle}
-      className={`border-b border-white/[0.04] transition-all duration-300 row-hover group last:border-0 cursor-pointer ${
+      className={`relative overflow-hidden cursor-pointer transition-all duration-300 rounded-2xl border ${
         selected
-          ? "bg-base-blue/10 hover:bg-base-blue/15"
-          : "hover:bg-white/[0.02]"
+          ? "bg-accent/10 border-accent/30 shadow-[0_0_20px_rgba(var(--accent-rgb),0.1)]"
+          : "bg-white/[0.02] border-white/5 hover:border-white/10"
       }`}
     >
-      {/* Checkbox */}
-      <td className="w-14 pl-6 py-4">
-        <div
-          className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all duration-300 ${
-            selected
-              ? "bg-base-blue border-base-blue shadow-[0_0_15px_rgba(0,82,255,0.3)]"
-              : "border-white/10 group-hover:border-white/20"
-          }`}
-        >
-          {selected && (
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M2 5l2 2 4-4" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )}
-        </div>
-      </td>
+      <div className="flex flex-col md:flex-row md:items-center p-4 md:px-6 md:py-4 gap-4">
+        {/* Selection + Token Info Wrapper */}
+        <div className="flex items-center gap-4 flex-1">
+          {/* Custom Checkbox */}
+          <div
+            className={`flex-shrink-0 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-300 ${
+              selected
+                ? "bg-accent border-accent shadow-[0_0_15px_var(--accent-glow)]"
+                : "border-white/10"
+            }`}
+          >
+            {selected && (
+              <svg width="12" height="12" viewBox="0 0 10 10" fill="none">
+                <path d="M2 5l2 2 4-4" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </div>
 
-      {/* Token info */}
-      <td className="py-4">
-        <div className="flex items-center gap-3">
+          {/* Token Visuals */}
           <div className="relative">
-            <div className="w-8 h-8 rounded-lg bg-white/[0.03] border border-white/10 flex items-center justify-center overflow-hidden group-hover:border-base-blue/30 transition-colors">
+            <div className="w-10 h-10 md:w-8 md:h-8 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-center overflow-hidden">
               {token.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={token.logoUrl} alt={token.symbol} className="w-full h-full object-cover" />
               ) : (
-                <span className="text-[10px] font-black" style={{ color: token.logoColor }}>
+                <span className="text-xs font-black" style={{ color: token.logoColor }}>
                   {token.logoLetter}
                 </span>
               )}
             </div>
-            {isPossiblyDead && (
-              <div className="absolute -top-1 -right-1 text-[10px]">🔥</div>
+            {isUnpriced && (
+              <div className="absolute -top-1 -right-1 text-[10px] opacity-70">🔍</div>
             )}
           </div>
-          <div className="text-right">
-            <div className="text-xs font-black text-white">{token.symbol}</div>
-            <div className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter truncate max-w-[80px]">{token.name}</div>
+
+          {/* Token Identification */}
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-black text-text-primary">{token.symbol}</span>
+              {isUnpriced && (
+                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 uppercase tracking-widest border border-blue-500/20">
+                  {t.unindexedLiquidity}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] font-bold text-text-muted uppercase tracking-tight truncate max-w-[120px]">
+              {token.name}
+            </span>
           </div>
         </div>
-      </td>
 
-      {/* Balance */}
-      <td className="py-4 text-left">
-        <div className="text-xs font-bold text-slate-400">
-          {token.balanceFormatted.toLocaleString(undefined, { maximumFractionDigits: 4 })}
-        </div>
-      </td>
+        {/* Balance and Value - Responsive Layout */}
+        <div className="flex md:items-center justify-between md:justify-end gap-6 md:gap-12 pl-10 md:pl-0 border-t border-white/5 pt-3 md:border-0 md:pt-0">
+          <div className="flex flex-col md:items-end">
+            <span className="text-[10px] font-bold text-text-muted md:hidden uppercase tracking-widest mb-1">{isArabic ? "الرصيد" : "Balance"}</span>
+            <span className="text-xs font-bold text-text-secondary">
+              {token.balanceFormatted.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+            </span>
+          </div>
 
-      {/* USD Value */}
-      <td className="py-4 pr-6 text-left">
-        <div className={`text-xs font-black tabular-nums ${
-          hasValue ? (token.usdValue >= 5 ? "text-emerald-400" : "text-white") : "text-slate-800"
-        }`}>
-          {hasValue ? `$${token.usdValue.toFixed(2)}` : "$0.00"}
+          <div className="flex flex-col md:items-end min-w-[80px]">
+            <span className="text-[10px] font-bold text-text-muted md:hidden uppercase tracking-widest mb-1">{isArabic ? "القيمة" : "Value"}</span>
+            <span className={`text-sm font-black tabular-nums ${
+              hasValue ? (token.usdValue >= 5 ? "text-emerald-400" : "text-text-primary") : "text-text-muted"
+            }`}>
+              {hasValue ? (token.usdValue >= 0.01 ? `$${token.usdValue.toFixed(2)}` : `$${token.usdValue.toFixed(4)}`) : "$0.00"}
+            </span>
+          </div>
         </div>
-      </td>
-    </tr>
+      </div>
+
+      {/* Modern interaction highlight */}
+      {selected && (
+        <motion.div
+          layoutId={`highlight-${token.address}`}
+          className="absolute inset-0 bg-accent/5 pointer-events-none"
+        />
+      )}
+    </motion.div>
   );
 }
