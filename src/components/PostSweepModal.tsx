@@ -1,19 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { type TokenBalance } from "@/hooks/useTokenBalances";
-import { generateReferralLink, REFERRAL_FEE_SHARE } from "@/lib/referral";
-import { formatUSDC } from "@/lib/sweep";
-import { useAccount } from "wagmi";
+import { motion, AnimatePresence } from "framer-motion";
 import { useUI } from "@/context/UIContext";
 
 interface PostSweepModalProps {
   receivedUSDC: string;
-  deadTokens: TokenBalance[];
+  deadTokens: any[];
   sellTxHash?: string;
   onBurnDead: () => void;
   onClose: () => void;
-  isBurning?: boolean;
+  isBurning: boolean;
 }
 
 export function PostSweepModal({
@@ -24,204 +20,84 @@ export function PostSweepModal({
   onClose,
   isBurning,
 }: PostSweepModalProps) {
-  const { t, isArabic, isLight } = useUI();
-  const { address } = useAccount();
-  const [step, setStep] = useState<"congrats" | "referral">("congrats");
-  const [copied, setCopied] = useState(false);
-  const referralLink = address ? generateReferralLink(address) : "";
-
-  const copyLink = async () => {
-    if (!referralLink) return;
-    await navigator.clipboard.writeText(referralLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
+  const { t, isArabic } = useUI();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-3xl border border-divider bg-bg-surface shadow-2xl overflow-hidden">
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="absolute inset-0 bg-bg-main/90 backdrop-blur-xl"
+        />
+        
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 20 }}
+          className="v-glass w-full max-w-lg rounded-[2.5rem] p-8 md:p-12 relative overflow-hidden shadow-[0_0_100px_rgba(0,82,255,0.2)]"
+        >
+          {/* Success Decoration */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 bg-emerald-500/10 blur-[60px] rounded-full -mt-24" />
+          
+          <div className="relative z-10 text-center space-y-8">
+            <div className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-2xl shadow-emerald-500/30">
+              <svg className="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
 
-        {step === "congrats" ? (
-          <>
-            {/* Header */}
-            <div className={`relative px-6 pt-8 pb-6 text-center ${isLight ? "bg-emerald-50" : "bg-gradient-to-b from-emerald-950/40 to-bg-surface"}`}>
-              <div className="text-6xl mb-4">✅</div>
-              <h2 className="text-xl font-bold text-text-primary mb-1">{isArabic ? "المحفظة نظيفة تماماً!" : "Wallet Cleaned!"}</h2>
-              <div className="flex items-center justify-center gap-2 mt-3">
-                <span className="text-text-muted text-sm">{isArabic ? "استلمت" : "You Received"}</span>
-                <span className="text-2xl font-bold text-emerald-400">{receivedUSDC}</span>
-                <span className="text-text-muted text-sm">USDC</span>
-              </div>
+            <div className="space-y-3">
+              <h2 className="text-4xl font-black font-heading text-text-primary tracking-tighter">
+                {t.cleaningSuccess}
+              </h2>
+              <p className="text-text-secondary font-semibold text-lg">
+                +{receivedUSDC} USDC Received
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
               {sellTxHash && (
                 <a
                   href={`https://basescan.org/tx/${sellTxHash}`}
                   target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 inline-block text-[11px] text-accent hover:underline"
+                  rel="noreferrer"
+                  className="v-btn-secondary !py-4 text-[11px]"
                 >
-                  {isArabic ? "عرض على BaseScan ↗" : "View on BaseScan ↗"}
+                  🚀 {t.viewTx}
                 </a>
               )}
-            </div>
 
-            <div className="p-5 space-y-4">
-              {/* Dead tokens section */}
               {deadTokens.length > 0 ? (
-                <div className="bg-[#1A0A00] border border-orange-900/30 rounded-2xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xl">🔥</span>
-                    <div>
-                      <div className="text-sm font-semibold text-orange-400">
-                        {isArabic ? `لديك ${deadTokens.length} رمز بلا سيولة` : `You have ${deadTokens.length} inactive tokens`}
-                      </div>
-                      <div className="text-[11px] text-text-muted">{isArabic ? "حرقها ينظّف محفظتك تماماً" : "Burning them fully cleans your wallet"}</div>
-                    </div>
-                  </div>
-                  <div className="space-y-1 max-h-28 overflow-y-auto mb-3">
-                    {deadTokens.map((t) => (
-                      <div key={t.address} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold"
-                            style={{ background: t.logoColor + "22", color: t.logoColor }}
-                          >
-                            {t.logoLetter}
-                          </span>
-                          <span className="text-text-muted">{t.symbol}</span>
-                          <span className="text-text-muted opacity-50 text-[10px]">
-                            {t.balanceFormatted.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                        <span className="text-orange-800 text-[10px]">{isArabic ? "بلا سيولة" : "No Liquidity"}</span>
-                      </div>
-                    ))}
+                <div className="v-card p-8 bg-bg-elevated/50 space-y-6 mt-4">
+                  <div className="space-y-2 text-left">
+                    <p className="v-stat-label !text-orange-500 text-center">Remaining Dead Assets 🔥</p>
+                    <p className="text-[11px] text-text-muted text-center font-bold">
+                      {deadTokens.length} tokens have no market value. Burn them to reach Zero-Dust?
+                    </p>
                   </div>
                   <button
                     onClick={onBurnDead}
                     disabled={isBurning}
-                    className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold text-sm transition-all active:scale-[0.98] disabled:opacity-60"
+                    className="w-full py-5 v-btn-primary !bg-orange-600 shadow-orange-600/20"
                   >
-                    {isBurning ? (
-                      <>
-                        <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2 align-middle" />
-                        {isArabic ? "جارٍ الحرق..." : "Burning..."}
-                      </>
-                    ) : (
-                      isArabic ? `🔥 حرق ${deadTokens.length} رمز بضغطة واحدة` : `🔥 Burn ${deadTokens.length} Tokens Now`
-                    )}
+                    {isBurning ? "Burning..." : "Finish: Burn Dead Tokens"}
                   </button>
                 </div>
               ) : (
-                <div className={`border rounded-2xl p-4 text-center ${isLight ? "bg-emerald-50 border-emerald-100" : "bg-[#0A1A0A] border-emerald-900/20"}`}>
-                  <div className="text-2xl mb-1">🏆</div>
-                  <div className="text-sm text-emerald-400 font-medium">{isArabic ? "محفظتك نظيفة 100%!" : "100% Clean Portfolio!"}</div>
-                  <div className="text-xs text-text-muted mt-1">{isArabic ? "لا توجد توكنات ميتة" : "No inactive assets remaining"}</div>
-                </div>
+                <button
+                  onClick={onClose}
+                  className="v-btn-primary w-full mt-4"
+                >
+                  {t.completed}
+                </button>
               )}
-
-              <button
-                onClick={() => setStep("referral")}
-                className="w-full py-3 rounded-xl border border-accent/30 bg-accent/5 text-accent font-semibold text-sm hover:bg-accent/10 transition-all"
-              >
-                {isArabic ? `🔗 اكتشف كيف تربح ${REFERRAL_FEE_SHARE}% من أصدقائك ←` : `🔗 Earn ${REFERRAL_FEE_SHARE}% from friends ←`}
-              </button>
-
-              <button onClick={onClose} className="w-full text-xs text-text-muted hover:text-text-primary transition-all">
-                {isArabic ? "إغلاق" : "Close"}
-              </button>
             </div>
-          </>
-        ) : (
-          /* Referral step */
-          <>
-            <div className={`relative px-6 pt-8 pb-6 text-center ${isLight ? "bg-accent/10" : "bg-gradient-to-b from-[#0A0B1A] to-bg-surface"}`}>
-              <button
-                onClick={() => setStep("congrats")}
-                className="absolute top-4 right-4 text-text-muted hover:text-text-primary text-xl"
-              >
-                {isArabic ? "←" : "→"}
-              </button>
-              <div className="text-5xl mb-3">💎</div>
-              <h2 className="text-xl font-bold text-text-primary mb-1">{isArabic ? "اربح مع كل صديق!" : "Earn With Friends!"}</h2>
-              <p className="text-text-secondary text-sm">
-                {isArabic ? "احصل على" : "Earn"}
-                {" "}
-                <span className="text-amber-400 font-bold">{REFERRAL_FEE_SHARE}%</span>
-                {" "}
-                {isArabic ? "من رسوم كل مستخدم تُحيله — تلقائياً وإلى الأبد" : "of every referred user's fee — automatically & forever"}
-              </p>
-            </div>
-
-            <div className="p-5 space-y-4">
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-2 text-center">
-                {[
-                  { label: isArabic ? "نسبة عمولتك" : "Your Share", value: `${REFERRAL_FEE_SHARE}%`, color: "text-amber-400" },
-                  { label: isArabic ? "من كل صفقة" : "Per Trade", value: isArabic ? "مدى الحياة" : "Lifetime", color: "text-emerald-400" },
-                  { label: isArabic ? "الدفع" : "Payout", value: isArabic ? "تلقائي" : "Instant", color: "text-accent" },
-                ].map((s, i) => (
-                  <div key={i} className="bg-bg-surface rounded-xl p-2.5 border border-divider">
-                    <div className={`text-sm font-bold ${s.color}`}>{s.value}</div>
-                    <div className="text-[10px] text-text-muted mt-0.5">{s.label}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Link */}
-              <div>
-                <div className="text-[10px] text-text-muted mb-1.5 uppercase tracking-widest">{isArabic ? "رابطك الفريد" : "Your Unique Link"}</div>
-                <div className="flex gap-2">
-                  <div className="flex-1 bg-bg-surface border border-divider rounded-lg px-3 py-2 font-mono text-[10px] text-text-muted truncate">
-                    {referralLink || (isArabic ? "ربط محفظتك أولاً" : "Connect wallet first")}
-                  </div>
-                  <button
-                    onClick={copyLink}
-                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                      copied
-                        ? "bg-emerald-600 text-white"
-                        : "bg-accent text-white hover:bg-accent/80"
-                    }`}
-                  >
-                    {copied ? "✓" : (isArabic ? "نسخ" : "Copy")}
-                  </button>
-                </div>
-              </div>
-
-              {/* Share */}
-              <div className="grid grid-cols-3 gap-2">
-                <a
-                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(isArabic ? `🗑️ CoinBin — نظّف محفظتك على Base!\nبيع رموزك الغبار → USDC بضغطة واحدة 💰\n\n${referralLink}` : `🗑️ CoinBin — Clean your Base wallet!\nSell dust tokens → USDC in one click 💰\n\n${referralLink}`)}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="flex flex-col items-center gap-1 py-2.5 rounded-xl border border-divider text-[10px] text-text-muted hover:text-text-primary hover:border-divider transition-all"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                  {isArabic ? "تويتر" : "Twitter"}
-                </a>
-                <a
-                  href={`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(isArabic ? "🗑️ CoinBin — بيع رموزك الغبار على Base" : "🗑️ CoinBin — Sell your dust tokens on Base")}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="flex flex-col items-center gap-1 py-2.5 rounded-xl border border-divider text-[10px] text-text-muted hover:text-text-primary hover:border-divider transition-all"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-                  {isArabic ? "تليجرام" : "Telegram"}
-                </a>
-                <a
-                  href={`https://wa.me/?text=${encodeURIComponent(isArabic ? `🗑️ CoinBin — نظّف محفظتك على Base!\nبيع رموزك → USDC بضغطة واحدة\n\n${referralLink}` : `🗑️ CoinBin — Clean your Base wallet!\nSell tokens → USDC in one click\n\n${referralLink}`)}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="flex flex-col items-center gap-1 py-2.5 rounded-xl border border-divider text-[10px] text-text-muted hover:text-text-primary hover:border-divider transition-all"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
-                  {isArabic ? "واتساب" : "WhatsApp"}
-                </a>
-              </div>
-
-              <button onClick={onClose} className="w-full py-3 rounded-xl bg-accent hover:bg-accent/80 text-white font-semibold text-sm transition-all">
-                {isArabic ? "تم 🎉" : "Done 🎉"}
-              </button>
-            </div>
-          </>
-        )}
+          </div>
+        </motion.div>
       </div>
-    </div>
+    </AnimatePresence>
   );
 }

@@ -181,46 +181,50 @@ export default function HomePage() {
     filteredTokens.filter((t) => t.canSell).every((t) => selected.has(t.address));
 
   return (
-    <div className="min-h-screen bg-bg-primary text-white selection:bg-base-blue/30 selection:text-white pb-20">
+    <div className={`min-h-screen bg-bg-main text-text-primary selection:bg-accent selection:text-white transition-colors duration-500`}>
       <div className="mesh-gradient" />
 
       {/* ─── Compact Header ────────────────────────────────────────────── */}
-      <header className="border-b border-white/5 bg-bg-surface/60 backdrop-blur-2xl sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3 group cursor-pointer" onClick={() => window.location.reload()}>
-            <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center shadow-lg shadow-accent/20 overflow-hidden relative">
+      <header className="v-glass sticky top-0 z-40 border-b-0">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-4 group cursor-pointer" onClick={() => window.location.reload()}>
+            <div className="w-12 h-12 rounded-2xl bg-accent flex items-center justify-center shadow-xl shadow-accent/20 overflow-hidden relative">
               <Image 
                 src="/logo.png" 
                 alt="CoinBin" 
-                width={40}
-                height={40}
+                width={48}
+                height={48}
                 className="w-full h-full object-cover transition-transform group-hover:scale-110" 
               />
             </div>
-            <span className="text-xl font-black tracking-tighter text-text-primary">CoinBin</span>
+            <div className="flex flex-col -gap-1">
+              <span className="text-2xl font-black tracking-tighter text-text-primary font-heading uppercase">CoinBin</span>
+              <span className="text-[9px] font-black text-accent tracking-[0.3em] uppercase ml-0.5">Base Cleaner</span>
+            </div>
           </div>
 
           <div className="flex items-center gap-4 md:gap-8">
-            {/* Toggles Group */}
-            <div className="flex items-center gap-2 p-1 bg-white/5 rounded-2xl border border-white/5 pr-2">
-              <div className="px-3 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Settings ⚙️</div>
+            {/* Settings Toggles */}
+            <div className="flex items-center gap-2 p-1.5 bg-bg-elevated/50 rounded-[1.25rem] border border-divider">
+               <div className="hidden sm:block px-3 text-[9px] font-black text-text-muted uppercase tracking-[0.2em] opacity-50">Settings</div>
+               
                {/* Theme Toggle */}
                <button 
                 onClick={() => setTheme(isLight ? 'dark' : 'light')}
-                className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/10 transition-all text-lg"
+                className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/5 transition-all text-lg shadow-sm"
                 title={isLight ? "Dark Mode" : "Light Mode"}
               >
                 {isLight ? "🌙" : "☀️"}
               </button>
 
-              <div className="w-[1px] h-4 bg-white/10 mx-1" />
+              <div className="w-[1px] h-4 bg-divider mx-1" />
 
               {/* Language Toggle */}
               <button 
                 onClick={() => setLanguage(isArabic ? 'en' : 'ar')}
-                className="px-3 h-10 flex items-center justify-center rounded-xl hover:bg-white/10 transition-all text-[11px] font-black uppercase tracking-widest"
+                className="px-4 h-10 flex items-center justify-center rounded-xl hover:bg-white/5 transition-all text-[11px] font-black uppercase tracking-widest text-text-secondary"
               >
-                {isArabic ? "English" : "عربي"}
+                {isArabic ? "EN" : "AR"}
               </button>
             </div>
 
@@ -231,7 +235,7 @@ export default function HomePage() {
             )}
 
             <Wallet>
-              <ConnectWallet className="!bg-accent !text-white !rounded-xl !text-[11px] !px-4 !py-2 hover:brightness-110 transition-all font-black uppercase tracking-widest shadow-lg shadow-accent/10">
+              <ConnectWallet className="!bg-accent !text-white !rounded-xl !text-[11px] !px-5 !py-3 hover:scale-105 active:scale-95 transition-all font-black uppercase tracking-widest shadow-xl shadow-accent/20 border-0">
                 <Avatar className="h-5 w-5" />
                 <Name className="!text-white" />
               </ConnectWallet>
@@ -250,15 +254,16 @@ export default function HomePage() {
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         {!isConnected ? (
-          <div className="flex flex-col items-center justify-center py-32 text-center animate-in fade-in slide-in-from-bottom-8 duration-700">
-            <h1 className="text-5xl md:text-7xl font-black text-text-primary mb-6 leading-tight tracking-tighter">
-              {t.subtitle.split(',')[0]}, <span className="text-accent">{t.subtitle.split(',')[1]}</span>
+          <div className="flex flex-col items-center justify-center py-24 md:py-40 text-center animate-in fade-in slide-in-from-bottom-12 duration-1000">
+            <h1 className="text-6xl md:text-8xl font-black text-text-primary mb-8 leading-[0.9] tracking-tighter">
+              {t.subtitle.split(',')[0]}<br/>
+              <span className="text-accent italic font-black">{t.subtitle.split(',')[1]}</span>
             </h1>
-            <p className="text-text-secondary text-lg mb-12 max-w-xl font-medium">
+            <p className="text-text-secondary text-lg md:text-xl mb-12 max-w-2xl font-medium leading-relaxed">
               {t.description}
             </p>
             <Wallet>
-              <ConnectWallet className="!bg-accent !text-white !rounded-2xl !text-lg !px-12 !py-6 hover:brightness-110 shadow-2xl shadow-accent/20 active:scale-95 transition-all font-black uppercase tracking-widest" />
+              <ConnectWallet className="v-btn-primary !text-lg !px-16 !py-8 shadow-2xl scale-110 hover:scale-115" />
             </Wallet>
           </div>
         ) : (
@@ -276,24 +281,24 @@ export default function HomePage() {
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8 items-start">
               {/* Token List Section */}
               <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white/[0.02] border border-white/5 rounded-[2rem] p-3 backdrop-blur-md">
-                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full sm:w-auto p-1">
+                <div className="flex flex-col sm:flex-row gap-4 items-center justify-between v-glass rounded-[2rem] p-2 backdrop-blur-3xl shadow-xl">
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full sm:w-auto p-1 pl-4">
                     <button
                       onClick={toggleAll}
-                      className={`text-[10px] font-black px-4 py-2 rounded-xl transition-all uppercase tracking-widest border ${
-                        allSellableSelected ? "bg-red-500/10 border-red-500/20 text-red-500" : "bg-white/5 border-transparent text-text-secondary hover:text-text-primary"
+                      className={`text-[9.5px] font-black px-5 py-3 rounded-[1.25rem] transition-all uppercase tracking-[0.2em] ${
+                        allSellableSelected ? "bg-red-500 text-white shadow-lg shadow-red-500/20" : "bg-bg-elevated text-text-secondary hover:text-text-primary"
                       }`}
                     >
-                      {allSellableSelected ? (isArabic ? "إلغاء التحديد" : "Deselect All") : (isArabic ? "تحديد الكل" : "Select All")}
+                      {allSellableSelected ? (isArabic ? "إلغاء الكل" : "Reset") : (isArabic ? "تحديد الكل" : "Select All")}
                     </button>
                     {(["all", "dust", "nonzero", "dead"] as FilterType[]).map((f) => (
                       <button
                         key={f}
                         onClick={() => setFilter(f)}
-                        className={`text-[10px] font-black px-4 py-2 rounded-xl transition-all uppercase tracking-widest whitespace-nowrap border ${
+                        className={`text-[9.5px] font-black px-5 py-3 rounded-[1.25rem] transition-all uppercase tracking-[0.2em] whitespace-nowrap ${
                           filter === f
-                            ? "bg-accent/10 border-accent/20 text-accent"
-                            : "bg-transparent border-transparent text-text-muted hover:text-text-secondary"
+                            ? "bg-accent text-white shadow-lg shadow-accent/20"
+                            : "bg-transparent text-text-muted hover:text-text-secondary"
                         }`}
                       >
                         {f === "all" ? t.all : 
@@ -304,38 +309,38 @@ export default function HomePage() {
                     ))}
                   </div>
 
-                  <div className="relative w-full sm:w-64">
+                  <div className="relative w-full sm:w-72 sm:pr-2">
                     <input
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder={t.search}
-                      className="w-full text-[11px] font-bold py-2.5 pr-10 pl-4 rounded-xl bg-bg-surface border border-white/5 focus:border-accent/30 outline-none transition-all placeholder:text-text-muted"
+                      className="w-full text-xs font-bold py-4 pr-12 pl-6 rounded-[1.5rem] bg-bg-elevated border-0 focus:ring-2 focus:ring-accent/50 outline-none transition-all placeholder:text-text-muted text-text-primary"
                     />
-                    <div className={`absolute inset-y-0 ${isArabic ? 'right-3' : 'right-3'} flex items-center text-text-muted`}>
+                    <div className="absolute inset-y-0 right-8 flex items-center text-text-muted opacity-50">
                       🔍
                     </div>
                   </div>
                 </div>
 
-                <div className="glass rounded-[2rem] md:rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl">
+                <div className="v-glass rounded-[2.5rem] p-1 md:p-3 shadow-2xl overflow-hidden border-divider">
                   {loading ? (
-                    <div className="p-20 md:p-32 text-center">
-                      <div className="w-12 h-12 border-4 border-accent/20 border-t-accent rounded-full animate-spin mx-auto mb-4" />
-                      <p className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] animate-pulse">Scanning Wallet...</p>
+                    <div className="py-24 md:py-40 text-center flex flex-col items-center">
+                      <div className="w-16 h-16 border-[6px] border-accent/10 border-t-accent rounded-full animate-spin mb-6" />
+                      <p className="text-[11px] font-black text-text-muted uppercase tracking-[0.4em] animate-pulse">Scanning Base Protocol...</p>
                     </div>
                   ) : filteredTokens.length === 0 ? (
-                    <div className="py-20 md:py-32 text-center">
-                      <p className="text-4xl mb-4">🔍</p>
-                      <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest text-center">لا توجد عملات مطابقة</p>
+                    <div className="py-24 md:py-40 text-center flex flex-col items-center">
+                      <span className="text-6xl mb-6 grayscale opacity-20">🕳️</span>
+                      <p className="text-[11px] font-black text-text-muted uppercase tracking-[0.3em]">{isArabic ? "لا توجد نتائج" : "No Assets Found"}</p>
                     </div>
                   ) : (
-                    <div className="p-3 md:p-6">
-                      <div className="hidden md:grid md:grid-cols-[1fr_100px_100px] gap-4 mb-4 px-6 border-b border-white/5 pb-4">
-                        <span className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">{isArabic ? "الرمز" : "Asset"}</span>
-                        <span className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-right">{isArabic ? "الرصيد" : "Balance"}</span>
-                        <span className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-right">{isArabic ? "القيمة" : "Value"}</span>
+                    <div className="p-2 md:p-6">
+                      <div className="hidden md:grid md:grid-cols-[1fr_120px_120px] gap-6 mb-6 px-8 border-b border-divider pb-6">
+                        <span className="v-stat-label">{isArabic ? "الرمز" : "Asset"}</span>
+                        <span className="v-stat-label text-right">{isArabic ? "الرصيد" : "Balance"}</span>
+                        <span className="v-stat-label text-right">{isArabic ? "القيمة" : "Value"}</span>
                       </div>
-                      <div className="flex flex-col gap-3">
+                      <div className="flex flex-col gap-2">
                         {filteredTokens.map((token) => (
                           <TokenRow
                             key={token.address}
@@ -363,21 +368,24 @@ export default function HomePage() {
                 />
                 
                 {unpricedTokens.length > 0 && (
-                  <div className="glass-card rounded-3xl p-6 border-divider group">
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-[11px] font-black text-text-muted uppercase tracking-widest">{isArabic ? "لم نجد سعراً محدداً 🔍" : "Unknown Liquidity 🔍"}</h4>
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-white/5 text-text-muted">{unpricedTokens.length}</span>
+                  <div className="v-card rounded-[2rem] p-8 border-divider relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-orange-500/10 transition-colors" />
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between mb-6">
+                        <h4 className="v-stat-label !text-orange-500">{isArabic ? "سيولة مخفية 🔍" : "Hidden Liquidity 🔍"}</h4>
+                        <span className="text-[10px] font-black px-3 py-1 rounded-full bg-orange-500/10 text-orange-500 border border-orange-500/20">{unpricedTokens.length}</span>
+                      </div>
+                      <p className="text-[11px] text-text-secondary font-semibold mb-8 leading-relaxed opacity-80">
+                        {isArabic ? "هذه العملات غير مسعرة في المنصات الكبيرة. جرب استخدام 'Sweep' أولاً للفحص العميق، إذا لم يظهر سعر، يمكنك الحرق لتنظيف المحفظة." : "These assets are not indexed by major APIs. Try a 'Sweep' scan first—we'll check Aerodrome/Uniswap directly. If no route exists, you can burn to clean your wallet."}
+                      </p>
+                      <button 
+                        onClick={handleBurnDead}
+                        disabled={isBurningDead}
+                        className="w-full py-5 rounded-2xl bg-bg-main border border-divider text-text-muted text-[11px] font-black uppercase tracking-[0.2em] hover:bg-orange-600 transition-all hover:text-white active:scale-95 disabled:opacity-50 shadow-sm"
+                      >
+                        {isBurningDead ? t.burning : `${isArabic ? "حرق العملات غير المسعرة" : "Burn Unpriced Assets"} 🔥`}
+                      </button>
                     </div>
-                    <p className="text-[10px] text-text-secondary font-bold mb-6 leading-relaxed">
-                      {isArabic ? "هذه العملات غير مسعرة في المنصات الكبيرة. جرب استخدام السحب (Sweep) أولاً، فربما يجد النظام سيولة مخفية لها! إذا لم يجد، يمكنك حرقها." : "These assets don't have a public price yet. Try a 'Sweep' check—the system might find hidden liquidity! If no route is found, you can still burn them."}
-                    </p>
-                    <button 
-                      onClick={handleBurnDead}
-                      disabled={isBurningDead}
-                      className="w-full py-4 rounded-2xl bg-white/5 border border-divider text-text-muted text-[11px] font-black uppercase tracking-widest hover:bg-orange-600/20 hover:text-orange-400 transition-all active:scale-95 disabled:opacity-50"
-                    >
-                      {isBurningDead ? t.burning : `${isArabic ? "حرق جميع العملات غير المسعرة" : "Burn All Unpriced Tokens"} 🔥`}
-                    </button>
                   </div>
                 )}
               </aside>
