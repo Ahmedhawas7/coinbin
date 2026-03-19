@@ -16,6 +16,18 @@ const config: Config = {
           border: "#1E2028",
           muted: "#6B7280",
         },
+        bg: {
+          main: "var(--bg-main)",
+          surface: "var(--bg-surface)",
+          elevated: "var(--bg-elevated)",
+        },
+        text: {
+          primary: "var(--text-primary)",
+          secondary: "var(--text-secondary)",
+          muted: "var(--text-muted)",
+        },
+        accent: "var(--accent)",
+        divider: "var(--divider)",
       },
       fontFamily: {
         sans: ["var(--font-coinbase)", "system-ui", "sans-serif"],
