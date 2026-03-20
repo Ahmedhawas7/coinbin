@@ -31,3 +31,29 @@ export async function get0xQuote(
 
   return await res.json();
 }
+
+export async function get0xPrice(
+  tokenIn: string,
+  tokenOut: string,
+  amountIn: string
+) {
+  const params = new URLSearchParams({
+    sellToken: tokenIn,
+    buyToken: tokenOut,
+    sellAmount: amountIn,
+  });
+
+  const url = `${ZEROX_API_URL.replace("/quote", "/price")}?${params.toString()}`;
+
+  const res = await fetch(url, {
+    headers: {
+      "0x-api-key": ZEROX_API_KEY,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`0x Price Error`);
+  }
+
+  return await res.json();
+}

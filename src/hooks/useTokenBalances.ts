@@ -183,80 +183,44 @@ export function useTokenBalances() {
         }
       }
 
-      // c) Final Fallback: Aerodrome Multicall (Direct DEX check)
+      // c) Final Fallback: 0x API Aggregation (100% Market Parity)
       const stillMissing = tokenList.filter(t => !prices[t.address.toLowerCase()] || prices[t.address.toLowerCase()].price === 0);
       
       if (stillMissing.length > 0) {
         try {
-          // Prepare multicall for Aerodrome: [Direct Route, WETH Route]
-          const aeroCalls: any[] = [];
+          const { get0xPrice } = await import("@/lib/zerox");
           
-          stillMissing.forEach(t => {
-            const amountIn = BigInt(Math.pow(10, t.decimals)); // 1.0 token
+          const CHUNK_SIZE = 3;
+          for (let i = 0; i < stillMissing.length; i += CHUNK_SIZE) {
+            const chunk = stillMissing.slice(i, i + CHUNK_SIZE);
+            await Promise.allSettled(chunk.map(async (t) => {
+              const callRes = results[tokenList.indexOf(t)] as any;
+              if (callRes && callRes.success && callRes.returnData !== "0x") {
+                const rawBalance = BigInt(callRes.returnData);
+                if (rawBalance > 0n) {
+                  try {
+                    const data = await get0xPrice(t.address, TOKENS.USDC, rawBalance.toString());
+                    if (data && data.buyAmount) {
+                      const usdcAmount = Number(data.buyAmount) / 1e6;
+                      const tokenAmountDecimals = Number(rawBalance) / Math.pow(10, t.decimals);
+                      if (tokenAmountDecimals > 0) {
+                        const effectivePrice = usdcAmount / tokenAmountDecimals;
+                        prices[t.address.toLowerCase()] = { price: effectivePrice };
+                      }
+                    }
+                  } catch {
+                    // Ignore 0x error (indicates no market liquidity)
+                  }
+                }
+              }
+            }));
             
-            // Route 1: Direct
-            aeroCalls.push({
-              target: AERODROME_ROUTER,
-              allowFailure: true,
-              callData: encodeFunctionData({
-                abi: AERODROME_ROUTER_ABI,
-                functionName: "getAmountsOut",
-                args: [amountIn, [{ from: t.address, to: TOKENS.USDC, stable: false }]],
-              }),
-            });
-
-            // Route 2: WETH Routed
-            aeroCalls.push({
-              target: AERODROME_ROUTER,
-              allowFailure: true,
-              callData: encodeFunctionData({
-                abi: AERODROME_ROUTER_ABI,
-                functionName: "getAmountsOut",
-                args: [amountIn, [
-                  { from: t.address, to: TOKENS.WETH, stable: false },
-                  { from: TOKENS.WETH, to: TOKENS.USDC, stable: false }
-                ]],
-              }),
-            });
-          });
-
-          const aeroResults = await publicClient.readContract({
-            address: MULTICALL3_ADDRESS,
-            abi: MULTICALL3_ABI,
-            functionName: "aggregate3",
-            args: [aeroCalls],
-          }) as any[];
-
-          stillMissing.forEach((t, i) => {
-            const directRes = aeroResults[i * 2];
-            const routedRes = aeroResults[i * 2 + 1];
-            
-            let bestPrice = 0;
-
-            const decodeAero = (res: any) => {
-              if (!res?.success) return 0;
-              try {
-                const decoded = decodeFunctionResult({
-                  abi: AERODROME_ROUTER_ABI,
-                  functionName: "getAmountsOut",
-                  data: res.returnData,
-                }) as bigint[];
-                const out = decoded[decoded.length - 1];
-                // USDC has 6 decimals, so price = out / 1e6
-                return Number(out) / 1e6;
-              } catch { return 0; }
-            };
-
-            const p1 = decodeAero(directRes);
-            const p2 = decodeAero(routedRes);
-            bestPrice = Math.max(p1, p2);
-
-            if (bestPrice > 0) {
-              prices[t.address.toLowerCase()] = { price: bestPrice };
+            if (i + CHUNK_SIZE < stillMissing.length) {
+              await new Promise(r => setTimeout(r, 300));
             }
-          });
+          }
         } catch (err) {
-          console.error("Aerodrome Multicall fallback failed:", err);
+          console.error("0x API fallback failed:", err);
         }
       }
 
