@@ -51,7 +51,8 @@ export async function scanTokens(account: string): Promise<ScannedToken[]> {
   for (let i = 0; i < calls.length; i += CHUNK_SIZE) {
     const chunk = calls.slice(i, i + CHUNK_SIZE);
     try {
-      const chunkRes = await multicall.aggregate3(chunk);
+      // Force staticCall to prevent ethers from attempting a sendTransaction
+      const chunkRes = await multicall.aggregate3.staticCall(chunk);
       multicallResults.push(...chunkRes);
     } catch (e) {
       console.error(`[Scanner] ❌ Multicall chunk ${i} failed`, e);
