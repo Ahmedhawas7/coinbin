@@ -41,6 +41,7 @@ export default function HomePage() {
   const [slippageBps, setSlippageBps] = useState(50);
   const [showPostModal, setShowPostModal] = useState(false);
   const [isBurningDead, setIsBurningDead] = useState(false);
+  const [hasAutoSelected, setHasAutoSelected] = useState(false);
 
   const { state: sweepState, scan, startCleaning, reset } = useSweep();
 

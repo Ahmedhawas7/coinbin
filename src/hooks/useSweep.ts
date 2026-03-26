@@ -15,6 +15,9 @@ export interface SweepState {
   scannedTokens: ScannedToken[];
   swaps: SwapInstance[];
   progress: BatchProgress | null;
+  sellTxHash?: string;
+  burnTxHashes?: `0x${string}`[];
+  formattedUserReceives: string;
   error?: string;
 }
 
@@ -24,6 +27,7 @@ const INITIAL: SweepState = {
   scannedTokens: [],
   swaps: [],
   progress: null,
+  formattedUserReceives: "0",
 };
 
 export function useSweep() {
@@ -60,13 +64,30 @@ export function useSweep() {
       });
       
       const swaps = await engine.prepareSwaps(tokens);
-      patch({ status: "cleaning", swaps, currentStep: "Executing batch..." });
+      
+      // Calculate expected USDC
+      const totalUSDC = swaps.reduce((sum, s) => {
+        if (s.quote) return sum + (Number(s.quote.buyAmount) / 1e6);
+        return sum;
+      }, 0);
+
+      patch({ 
+        status: "cleaning", 
+        swaps, 
+        currentStep: "Executing batch...",
+        formattedUserReceives: totalUSDC.toFixed(2)
+      });
 
       const provider = new ethers.BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
 
       await engine.clean(signer, swaps, (progress) => {
-        patch({ progress, currentStep: progress.status });
+        patch({ 
+          progress, 
+          currentStep: progress.status,
+          sellTxHash: progress.sellTxHash,
+          burnTxHashes: progress.burnTxHashes
+        });
       });
 
       patch({ status: "success", currentStep: "Cleaning Complete!" });

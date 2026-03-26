@@ -8,6 +8,8 @@ export interface BatchProgress {
   current: number;
   status: string;
   errors: string[];
+  sellTxHash?: string;
+  burnTxHashes?: `0x${string}`[];
 }
 
 export async function executeBatchSell(
@@ -16,17 +18,20 @@ export async function executeBatchSell(
   onProgress: (progress: BatchProgress) => void
 ) {
   const errors: string[] = [];
+  const burnTxHashes: `0x${string}`[] = [];
+  let sellTxHash: string | undefined;
   const total = swaps.length;
 
   for (let i = 0; i < total; i++) {
     const swap = swaps[i];
-    onProgress({ total, current: i + 1, status: `Processing ${swap.symbol}...`, errors });
+    onProgress({ total, current: i + 1, status: `Processing ${swap.symbol}...`, errors, sellTxHash, burnTxHashes });
 
     try {
       if (swap.quote) {
         // Handle Approval if needed
         const token = new ethers.Contract(swap.tokenAddress, ERC20_ABI, signer);
-        const allowance = await token.allowance(await signer.getAddress(), swap.quote.allowanceTarget);
+        const address = await signer.getAddress();
+        const allowance = await token.allowance(address, swap.quote.allowanceTarget);
         
         if (BigInt(allowance) < swap.amountIn) {
           const approveTx = await token.approve(swap.quote.allowanceTarget, ethers.MaxUint256);
@@ -39,11 +44,13 @@ export async function executeBatchSell(
           data: swap.quote.data,
           value: swap.quote.value,
         });
+        sellTxHash = tx.hash;
         await tx.wait();
       } else {
         // Fallback: Burn
         const token = new ethers.Contract(swap.tokenAddress, ERC20_ABI, signer);
         const tx = await token.transfer(BURN_ADDRESS, swap.amountIn);
+        burnTxHashes.push(tx.hash as `0x${string}`);
         await tx.wait();
       }
     } catch (e: any) {
@@ -52,5 +59,5 @@ export async function executeBatchSell(
     }
   }
 
-  onProgress({ total, current: total, status: "Batch Complete", errors });
+  onProgress({ total, current: total, status: "Batch Complete", errors, sellTxHash, burnTxHashes });
 }
