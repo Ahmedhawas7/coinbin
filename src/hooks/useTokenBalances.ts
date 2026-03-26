@@ -22,9 +22,11 @@ export function useTokenBalances() {
     setError(null);
 
     try {
-      console.log(`[useTokenBalances] Orchestrating scan for ${address}`);
+      console.log(`[useTokenBalances] 🚀 Orchestrating scan for ${address}`);
       const results = await scanTokens(address);
       
+      console.log(`[useTokenBalances] 📊 Discovered ${results.length} tokens with positive balance.`);
+
       const mapped: TokenBalance[] = results.map(t => ({
         ...t,
         balanceFormatted: Number(t.balance) / Math.pow(10, t.decimals),
@@ -39,7 +41,7 @@ export function useTokenBalances() {
         return b.usdValue - a.usdValue;
       });
 
-      console.log(`[useTokenBalances] Scan complete. Total tokens with balance: ${mapped.length}`);
+      console.log(`[useTokenBalances] ✅ UI update with ${mapped.length} tokens.`);
       setTokens(mapped);
     } catch (e) {
       console.error("[useTokenBalances] Scan Orchestration Error:", e);

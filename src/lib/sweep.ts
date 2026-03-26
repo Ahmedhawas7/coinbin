@@ -273,16 +273,20 @@ export async function classifyTokens(
           console.warn(`Uniswap V3 fallback failed for ${token.symbol}`);
         }
 
-        // 4. If all fail, mark as burn
-        burnQuotes.push({ token, action: "burn", amountIn: token.balance });
-      } catch (err) {
-        // Log error but don't mark as burn if it's a known high-value token
-        // If 0x fail for any reason, we assume it's a burn (no liquidity / unswappable)
-        // unless it has significant USD value from GeckoTerminal, then it's a technical error.
+        // 4. If all fail, mark as burn or skip based on real value
         if (token.usdValue < 0.01) {
           burnQuotes.push({ token, action: "burn", amountIn: token.balance });
         } else {
-          console.error(`0x Quote failed for ${token.symbol} (${token.usdValue} USD):`, err);
+          console.warn(`[Sweep] Skipping ${token.symbol} (${token.usdValue} USD): Could not find sufficient swap route.`);
+        }
+      } catch (err) {
+        // Log error but don't mark as burn if it's a known high-value token
+        // If 0x fail for any reason, we assume it's a burn (no liquidity / unswappable)
+        // unless it has significant USD value from DexScreener/GeckoTerminal, then it's a technical error.
+        if (token.usdValue < 0.01) {
+          burnQuotes.push({ token, action: "burn", amountIn: token.balance });
+        } else {
+          console.error(`Swap evaluation failed for ${token.symbol} (${token.usdValue} USD):`, err);
         }
       }
     })

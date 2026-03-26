@@ -179,6 +179,12 @@ export const QUOTER_ABI = [
   },
 ] as const;
 
+// ─── Uniswap V2 Router ABI ──────────────────────────────────────────────────
+export const V2_ROUTER_ABI = [
+  "function getAmountsOut(uint amountIn, address[] calldata path) view returns (uint[] memory amounts)",
+  "function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) returns (uint[] memory amounts)"
+];
+
 // ─── Aerodrome Router ABI (Velodrome fork — used for most Base tokens) ───────
 export const AERODROME_ROUTER_ABI = [
   {
