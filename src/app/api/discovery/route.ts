@@ -25,9 +25,9 @@ export async function GET(request: Request) {
       
       if (!res.ok) break;
 
-      const data: any = await res.json();
+      const data = await res.json() as { items?: { token?: { address?: string } }[], next_page_params?: Record<string, string> };
       if (Array.isArray(data.items)) {
-        data.items.forEach((item: any) => {
+        data.items.forEach((item) => {
           if (item?.token?.address) {
             addresses.add(item.token.address.toLowerCase());
           }
@@ -41,7 +41,8 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({ tokens: Array.from(addresses) });
-  } catch (e: any) {
+  } catch (error) {
+    const e = error as Error;
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }

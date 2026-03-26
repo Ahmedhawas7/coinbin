@@ -5,9 +5,10 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useUI } from "@/context/UIContext";
 import { type SweepState } from "@/hooks/useSweep";
+import { type ScannedToken } from "@/lib/scanner";
 
 interface SweepPanelProps {
-  selectedTokens: any[];
+  selectedTokens: ScannedToken[];
   slippageBps: number;
   onSlippageChange: (val: number) => void;
   sweepState: SweepState;

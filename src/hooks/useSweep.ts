@@ -6,6 +6,7 @@ import { CleanerEngine } from "@/lib/cleaner";
 import { type ScannedToken } from "@/lib/scanner";
 import { type BatchProgress } from "@/lib/batchSell";
 import { type SwapInstance } from "@/lib/swap";
+import { toast } from "sonner";
 
 export type SweepStatus = "idle" | "scanning" | "preparing" | "cleaning" | "success" | "error";
 
@@ -40,13 +41,17 @@ export function useSweep() {
   const scan = useCallback(async () => {
     if (!address) return;
     patch({ status: "scanning", currentStep: "Discovering wallet assets..." });
+    toast.loading("جاري مسح المحفظة والبحث عن العملات...", { id: "sweep-action" });
     try {
       const engine = new CleanerEngine({ account: address as string });
       const results = await engine.scan();
       patch({ status: "idle", scannedTokens: results, currentStep: "" });
+      toast.success(`اكتمل الفحص! تم إيجاد ${results.length} عملة.`, { id: "sweep-action" });
       return results;
-    } catch (e: any) {
+    } catch (error) {
+      const e = error as Error;
       patch({ status: "error", error: e.message });
+      toast.error(`حدث خطأ أثناء المسح: ${e.message}`, { id: "sweep-action" });
       return [];
     }
   }, [address]);
@@ -55,6 +60,7 @@ export function useSweep() {
     if (!address || typeof window === "undefined" || !(window as any).ethereum) return;
     
     patch({ status: "preparing", currentStep: "Preparing swap routes..." });
+    toast.loading("جاري إعداد مسارات البيع وتجهيز المعاملات...", { id: "sweep-action" });
     
     try {
       const engine = new CleanerEngine({ 
@@ -88,12 +94,16 @@ export function useSweep() {
           sellTxHash: progress.sellTxHash,
           burnTxHashes: progress.burnTxHashes
         });
+        toast.loading(`تنفيذ جماعي: ${progress.status} (${progress.current}/${progress.total})`, { id: "sweep-action" });
       });
 
       patch({ status: "success", currentStep: "Cleaning Complete!" });
-    } catch (e: any) {
+      toast.success("تم تنظيف المحفظة بنجاح! 🚀", { id: "sweep-action", duration: 5000 });
+    } catch (error) {
+      const e = error as Error;
       console.error("Cleaning Error:", e);
       patch({ status: "error", error: e.message || "Batch execution failed" });
+      toast.error(`تعذر المعالجة: ${e.message || "خطأ غير معروف"}`, { id: "sweep-action", duration: 5000 });
     }
   }, [address]);
 

@@ -215,8 +215,8 @@ export async function fetchBaseTokenList(): Promise<string[]> {
     const data = await res.json();
     // Filter for Base Mainnet (chainId 8453)
     return data.tokens
-      .filter((t: any) => t.chainId === 8453)
-      .map((t: any) => t.address);
+      .filter((t: { chainId: number; address: string }) => t.chainId === 8453)
+      .map((t: { chainId: number; address: string }) => t.address);
   } catch (e) {
     console.error("Failed to fetch Base token list:", e);
     return [];

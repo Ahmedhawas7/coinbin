@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google";
+import { Toaster } from "sonner";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -50,6 +51,7 @@ export default function RootLayout({
     <html lang="ar" dir="rtl" className={`${jakarta.variable} ${spaceGrotesk.variable}`}>
       <body className="font-sans bg-bg-primary text-white antialiased selection:bg-accent/30 selection:text-white">
         <Providers>
+          <Toaster theme="dark" position="top-center" />
           <div className="mesh-gradient" />
           {children}
         </Providers>

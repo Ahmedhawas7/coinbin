@@ -2,10 +2,11 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useUI } from "@/context/UIContext";
+import { type ScannedToken } from "@/lib/scanner";
 
 interface PostSweepModalProps {
   receivedUSDC: string;
-  deadTokens: any[];
+  deadTokens: ScannedToken[];
   sellTxHash?: string;
   burnTxHashes?: `0x${string}`[];
   onBurnDead: () => void;

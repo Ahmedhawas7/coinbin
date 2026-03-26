@@ -79,7 +79,8 @@ export async function executeBatchSell(
         burnTxHashes.push(tx.hash as `0x${string}`);
         await tx.wait();
       }
-    } catch (e: any) {
+    } catch (error) {
+      const e = error as Error;
       console.error(`Error processing ${swap.symbol}:`, e);
       errors.push(`${swap.symbol}: ${e.message || "Unknown error"}`);
     }

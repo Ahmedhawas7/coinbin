@@ -47,7 +47,7 @@ export async function scanTokens(account: string): Promise<ScannedToken[]> {
 
   // Process in chunks to avoid RPC limits
   const CHUNK_SIZE = 120; // Slightly larger chunks for discovery
-  const multicallResults: any[] = [];
+  const multicallResults: { success: boolean, returnData: string }[] = [];
   for (let i = 0; i < calls.length; i += CHUNK_SIZE) {
     const chunk = calls.slice(i, i + CHUNK_SIZE);
     try {
@@ -118,71 +118,78 @@ export async function scanTokens(account: string): Promise<ScannedToken[]> {
   const dexscreenerPrices = await getDexScreenerPrices(discoveredTokens.map(t => t.address));
   console.log(`[Scanner] 📈 DexScreener priced ${dexscreenerPrices.size} tokens.`);
 
-  for (const token of discoveredTokens) {
-    let finalStatus: LiquidityStatus = "NO_LIQUIDITY";
-    let usdValue = 0;
-    let price = 0;
-    const formattedBalance = Number(token.balance) / Math.pow(10, token.decimals);
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < discoveredTokens.length; i += BATCH_SIZE) {
+    const batch = discoveredTokens.slice(i, i + BATCH_SIZE);
+    const batchPromises = batch.map(async (token) => {
+      let finalStatus: LiquidityStatus = "NO_LIQUIDITY";
+      let usdValue = 0;
+      let price = 0;
+      const formattedBalance = Number(token.balance) / Math.pow(10, token.decimals);
 
-    // Apply DexScreener as Fallback initial baseline
-    const dsPrice = dexscreenerPrices.get(token.address.toLowerCase());
-    if (dsPrice) {
-      price = dsPrice;
-      usdValue = price * formattedBalance;
-      // Mark as HIDDEN so UI shows it with a price. If 0x quotes, it upgrades to PRICED.
-      finalStatus = "HIDDEN"; 
-    }
-
-    // A. Try 0x Quote (Pure price)
-    try {
-      const quote = await get0xPrice(token.address, TOKENS.USDC, token.balance.toString());
-      if (quote) {
-        usdValue = Number(quote.buyAmount) / 1e6;
-        price = usdValue / formattedBalance;
-        finalStatus = "PRICED";
-        console.log(`[Scanner] 💰 PRICED: ${token.symbol} = $${usdValue.toFixed(2)} (via 0x)`);
+      // Apply DexScreener as Fallback initial baseline
+      const dsPrice = dexscreenerPrices.get(token.address.toLowerCase());
+      if (dsPrice) {
+        price = dsPrice;
+        usdValue = price * formattedBalance;
+        // Mark as HIDDEN so UI shows it with a price. If 0x quotes, it upgrades to PRICED.
+        finalStatus = "HIDDEN"; 
       }
-    } catch (e) {
-      console.warn(`[Scanner] 0x quote failed for ${token.symbol}, trying deep route discovery...`);
-    }
 
-    // B. Deep Liquidity detection (if not priced by 0x)
-    if (finalStatus !== "PRICED") {
+      // A. Try 0x Quote (Pure price)
       try {
-        const discovery = await discoverPools(token.address, token.balance);
-        if (discovery.hasPool && discovery.bestAmountOut > 0n) {
-          finalStatus = "HIDDEN";
-          
-          // Calculate price based on bestAmountOut and base asset
-          const outNum = Number(discovery.bestAmountOut);
-          if (discovery.bestBaseToken.toLowerCase() === TOKENS.USDC.toLowerCase() || 
-              discovery.bestBaseToken.toLowerCase() === "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca") {
-            usdValue = outNum / 1e6;
-          } else if (discovery.bestBaseToken.toLowerCase() === TOKENS.WETH.toLowerCase()) {
-            usdValue = (outNum / 1e18) * wethPrice;
-          }
-
+        const quote = await get0xPrice(token.address, TOKENS.USDC, token.balance.toString());
+        if (quote) {
+          usdValue = Number(quote.buyAmount) / 1e6;
           price = usdValue / formattedBalance;
-          console.log(`[Scanner] 🔍 HIDDEN: ${token.symbol} = $${usdValue.toFixed(2)} (via ${discovery.dexSource} | Best Out: ${discovery.bestAmountOut})`);
-        } else {
-          // Keep DexScreener HIDDEN status/values if we have them and discovery failed
-          if (dsPrice) {
-            console.log(`[Scanner] 📉 FALLBACK DXR: ${token.symbol} = $${usdValue.toFixed(2)} (via DexScreener)`);
-          } else {
-            console.log(`[Scanner] 💀 NO_LIQUIDITY: ${token.symbol}`);
-          }
+          finalStatus = "PRICED";
+          console.log(`[Scanner] 💰 PRICED: ${token.symbol} = $${usdValue.toFixed(2)} (via 0x)`);
         }
       } catch (e) {
-        console.error(`[Scanner] Deep discovery failed for ${token.symbol}:`, e);
+        console.warn(`[Scanner] 0x quote failed for ${token.symbol}, trying deep route discovery...`);
       }
-    }
 
-    enrichedTokens.push({
-      ...token,
-      usdValue,
-      status: finalStatus,
-      price
+      // B. Deep Liquidity detection (if not priced by 0x)
+      if (finalStatus !== "PRICED") {
+        try {
+          const discovery = await discoverPools(token.address, token.balance);
+          if (discovery.hasPool && discovery.bestAmountOut > 0n) {
+            finalStatus = "HIDDEN";
+            
+            // Calculate price based on bestAmountOut and base asset
+            const outNum = Number(discovery.bestAmountOut);
+            if (discovery.bestBaseToken.toLowerCase() === TOKENS.USDC.toLowerCase() || 
+                discovery.bestBaseToken.toLowerCase() === "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca") {
+              usdValue = outNum / 1e6;
+            } else if (discovery.bestBaseToken.toLowerCase() === TOKENS.WETH.toLowerCase()) {
+              usdValue = (outNum / 1e18) * wethPrice;
+            }
+
+            price = usdValue / formattedBalance;
+            console.log(`[Scanner] 🔍 HIDDEN: ${token.symbol} = $${usdValue.toFixed(2)} (via ${discovery.dexSource} | Best Out: ${discovery.bestAmountOut})`);
+          } else {
+            // Keep DexScreener HIDDEN status/values if we have them and discovery failed
+            if (dsPrice) {
+              console.log(`[Scanner] 📉 FALLBACK DXR: ${token.symbol} = $${usdValue.toFixed(2)} (via DexScreener)`);
+            } else {
+              console.log(`[Scanner] 💀 NO_LIQUIDITY: ${token.symbol}`);
+            }
+          }
+        } catch (e) {
+          console.error(`[Scanner] Deep discovery failed for ${token.symbol}:`, e);
+        }
+      }
+
+      return {
+        ...token,
+        usdValue,
+        status: finalStatus,
+        price
+      };
     });
+
+    const batchResults = await Promise.all(batchPromises);
+    enrichedTokens.push(...batchResults);
   }
 
   return enrichedTokens;
