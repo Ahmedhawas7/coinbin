@@ -188,15 +188,40 @@ export const KNOWN_TOKENS: TokenInfo[] = [
     logoLetter: "B",
   },
   {
-    address: "0xCfA3Ef56d303AE4fAabA0592388F19d7C3399FB4",
-    symbol: "EURC",
-    name: "Euro Coin",
+    address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    symbol: "USDC",
+    name: "USDC",
     decimals: 6,
-    logoColor: "#003399",
+    logoColor: "#2775CA",
+    logoLetter: "U",
+    coingeckoId: "usd-coin",
+  },
+  {
+    address: "0x0000000000000000000000000000000000000000",
+    symbol: "ETH",
+    name: "Ether",
+    decimals: 18,
+    logoColor: "#627EEA",
     logoLetter: "E",
-    coingeckoId: "euro-coin",
   },
 ];
+
+/**
+ * Fetches the official Base token list from Uniswap/Optimism
+ */
+export async function fetchBaseTokenList(): Promise<string[]> {
+  try {
+    const res = await fetch("https://raw.githubusercontent.com/ethereum-optimism/ethereum-optimism.github.io/master/optimism.tokenlist.json");
+    const data = await res.json();
+    // Filter for Base Mainnet (chainId 8453)
+    return data.tokens
+      .filter((t: any) => t.chainId === 8453)
+      .map((t: any) => t.address);
+  } catch (e) {
+    console.error("Failed to fetch Base token list:", e);
+    return [];
+  }
+}
 
 // Tokens that should never be sold (they ARE the output or stablecoins we keep)
 export const UNSELLABLE = new Set([

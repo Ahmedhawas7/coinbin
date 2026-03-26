@@ -1,9 +1,8 @@
 // src/hooks/useTokenBalances.ts
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAccount } from "wagmi";
-import { KNOWN_TOKENS, UNSELLABLE } from "@/lib/tokens";
+import { KNOWN_TOKENS, UNSELLABLE, fetchBaseTokenList } from "@/lib/tokens";
 import { scanTokens, type ScannedToken } from "@/lib/scanner";
-import { type Address } from "viem";
 
 export interface TokenBalance extends ScannedToken {
   balanceFormatted: number;
@@ -12,20 +11,35 @@ export interface TokenBalance extends ScannedToken {
 }
 
 export function useTokenBalances() {
-  const { address } = useAccount();
+  const { address, isConnected } = useAccount();
   const [tokens, setTokens] = useState<TokenBalance[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasFetchedList = useRef(false);
+  const [baseAddresses, setBaseAddresses] = useState<string[]>([]);
 
-  const fetchBalances = useCallback(async () => {
+  const fetchBalances = useCallback(async (customAddresses?: string[]) => {
     if (!address) return;
     setLoading(true);
     setError(null);
 
     try {
-      const knownAddresses = KNOWN_TOKENS.map(t => t.address);
-      const results = await scanTokens(address, knownAddresses);
+      // 1. Prepare address list
+      let addressesToScan: `0x${string}`[] = [...KNOWN_TOKENS.map(t => t.address)];
+      
+      if (customAddresses && customAddresses.length > 0) {
+        addressesToScan = [...new Set([...addressesToScan, ...customAddresses as `0x${string}`[]])];
+      } else if (baseAddresses.length > 0) {
+        addressesToScan = [...new Set([...addressesToScan, ...baseAddresses as `0x${string}`[]])];
+      }
 
+      console.log(`[useTokenBalances] Scanning ${addressesToScan.length} unique addresses...`);
+
+      // 2. Scan
+      const results = await scanTokens(address, addressesToScan);
+      console.log(`[useTokenBalances] Scan returned ${results.length} tokens with balance.`);
+
+      // 3. Map to UI Model
       const mapped: TokenBalance[] = results.map(t => ({
         ...t,
         balanceFormatted: Number(t.balance) / Math.pow(10, t.decimals),
@@ -38,13 +52,26 @@ export function useTokenBalances() {
 
       setTokens(mapped);
     } catch (e) {
-      console.error("Fetch Balances Error:", e);
+      console.error("[useTokenBalances] Fetch Balances Error:", e);
       setError(e instanceof Error ? e.message : "Failed to fetch balances");
     } finally {
       setLoading(false);
     }
-  }, [address]);
+  }, [address, baseAddresses]);
 
+  // Initial List Fetch
+  useEffect(() => {
+    if (isConnected && !hasFetchedList.current) {
+      hasFetchedList.current = true;
+      fetchBaseTokenList().then(list => {
+        if (list.length > 0) {
+          setBaseAddresses(list);
+        }
+      });
+    }
+  }, [isConnected]);
+
+  // Initial Balance Fetch
   useEffect(() => {
     if (address) {
       fetchBalances();
