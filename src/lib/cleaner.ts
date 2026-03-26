@@ -6,7 +6,7 @@ import { ethers } from "ethers";
 
 export interface CleanerConfig {
   account: string;
-  tokenAddresses: string[];
+  tokenAddresses?: string[];
   slippage?: number;
 }
 
@@ -18,7 +18,7 @@ export class CleanerEngine {
   }
 
   async scan(): Promise<ScannedToken[]> {
-    return await scanTokens(this.config.account, this.config.tokenAddresses);
+    return await scanTokens(this.config.account);
   }
 
   async prepareSwaps(tokens: ScannedToken[]): Promise<SwapInstance[]> {

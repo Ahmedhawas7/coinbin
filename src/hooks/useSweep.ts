@@ -37,11 +37,11 @@ export function useSweep() {
   const patch = (p: Partial<SweepState>) =>
     setState((prev) => ({ ...prev, ...p }));
 
-  const scan = useCallback(async (tokenAddresses: string[]) => {
+  const scan = useCallback(async () => {
     if (!address) return;
-    patch({ status: "scanning", currentStep: "Scanning on-chain liquidity..." });
+    patch({ status: "scanning", currentStep: "Discovering wallet assets..." });
     try {
-      const engine = new CleanerEngine({ account: address as string, tokenAddresses });
+      const engine = new CleanerEngine({ account: address as string });
       const results = await engine.scan();
       patch({ status: "idle", scannedTokens: results, currentStep: "" });
       return results;

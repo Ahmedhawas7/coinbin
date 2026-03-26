@@ -39,6 +39,16 @@ export const TOKENS = {
   DAI:   "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb" as const,
 } as const;
 
+// ─── DEX Factories on Base ──────────────────────────────────────────────────
+export const UNISWAP_V2_FACTORY = "0x8909Dc15e40173Ffb468934373d6a10Ee1926EBB" as const;
+export const UNISWAP_V3_FACTORY = "0x33128a8fC170d51EAd82794611193ef4519f39C0" as const;
+export const AERODROME_FACTORY  = "0x420DD3807E0e105CC5f7049386370428Ad97918a" as const;
+export const BASESWAP_FACTORY   = "0xFDa619b17f6549392e12874e45677810ec5c68AC" as const;
+
+export const V2_FACTORY_ABI = ["function getPair(address tokenA, address tokenB) view returns (address pair)"];
+export const V3_FACTORY_ABI = ["function getPool(address tokenA, address tokenB, uint24 fee) view returns (address pool)"];
+export const AERODROME_FACTORY_ABI = ["function getPool(address tokenA, address tokenB, bool stable) view returns (address pool)"];
+
 // Fee tiers for Uniswap V3 pools (in hundredths of a bip)
 export const FEE_TIERS = {
   LOWEST:  100,   // 0.01% — stable pairs

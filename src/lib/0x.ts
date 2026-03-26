@@ -14,6 +14,9 @@ export interface ZeroXQuote {
   allowanceTarget: string;
 }
 
+/**
+ * Fetches a swap quote for execution
+ */
 export async function get0xQuote(
   tokenIn: string,
   tokenOut: string,
@@ -21,13 +24,14 @@ export async function get0xQuote(
   taker: string,
   slippage: number = SLIPPAGE
 ): Promise<ZeroXQuote | null> {
+  console.log(`[0x] Fetching QUOTE for ${tokenIn} -> ${tokenOut} | Amount: ${amountIn}`);
   try {
     const params = new URLSearchParams({
       sellToken: tokenIn,
       buyToken: tokenOut,
       sellAmount: amountIn,
       takerAddress: taker,
-      slippagePercentage: slippage.toString(),
+      slippagePercentage: (slippage / 10000).toString(), // Convert bps to percentage (e.g., 100 bps -> 0.01)
     });
 
     const res = await fetch(`${ZEROX_API_URL}?${params.toString()}`, {
@@ -37,21 +41,29 @@ export async function get0xQuote(
     });
 
     if (!res.ok) {
+      const err = await res.json();
+      console.error("[0x] Quote API Error:", err);
       return null;
     }
 
-    return await res.json();
+    const data = await res.json();
+    console.log(`[0x] Quote received. Expected Buy Amount: ${data.buyAmount}`);
+    return data;
   } catch (error) {
-    console.error("0x Quote Error:", error);
+    console.error("[0x] Quote Fetch Exception:", error);
     return null;
   }
 }
 
+/**
+ * Fetches price only (for enrichment/estimation)
+ */
 export async function get0xPrice(
   tokenIn: string,
   tokenOut: string,
   amountIn: string
-): Promise<{ price: string; buyAmount: string } | null> {
+): Promise<{ price: string; buyAmount: string; estimatedGas: string } | null> {
+  console.log(`[0x] Fetching PRICE for ${tokenIn} -> ${tokenOut} | Amount: ${amountIn}`);
   try {
     const params = new URLSearchParams({
       sellToken: tokenIn,
@@ -59,8 +71,10 @@ export async function get0xPrice(
       sellAmount: amountIn,
     });
 
-    const url = ZEROX_API_URL.replace("/quote", "/price");
-    const res = await fetch(`${url}?${params.toString()}`, {
+    // Use /price instead of /quote for estimation
+    const priceUrl = ZEROX_API_URL.replace("/quote", "/price");
+    
+    const res = await fetch(`${priceUrl}?${params.toString()}`, {
       headers: {
         "0x-api-key": ZEROX_API_KEY,
       },
@@ -70,9 +84,11 @@ export async function get0xPrice(
       return null;
     }
 
-    return await res.json();
+    const data = await res.json();
+    console.log(`[0x] Price discovered: ${data.price} | Buy Amount: ${data.buyAmount}`);
+    return data;
   } catch (error) {
-    console.error("0x Price Error:", error);
+    console.error("[0x] Price Discovery Exception:", error);
     return null;
   }
 }

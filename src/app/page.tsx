@@ -128,7 +128,7 @@ export default function HomePage() {
     if (sweepState.status === "error" || sweepState.status === "success") { reset(); return; }
     
     if (sweepState.swaps.length === 0) {
-       await scan(selectedTokens.map(t => t.address));
+       await scan();
        return;
     }
     

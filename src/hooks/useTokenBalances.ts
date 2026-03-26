@@ -1,7 +1,7 @@
 // src/hooks/useTokenBalances.ts
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAccount } from "wagmi";
-import { KNOWN_TOKENS, UNSELLABLE, fetchBaseTokenList } from "@/lib/tokens";
+import { UNSELLABLE } from "@/lib/tokens";
 import { scanTokens, type ScannedToken } from "@/lib/scanner";
 
 export interface TokenBalance extends ScannedToken {
@@ -15,31 +15,16 @@ export function useTokenBalances() {
   const [tokens, setTokens] = useState<TokenBalance[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const hasFetchedList = useRef(false);
-  const [baseAddresses, setBaseAddresses] = useState<string[]>([]);
 
-  const fetchBalances = useCallback(async (customAddresses?: string[]) => {
+  const fetchBalances = useCallback(async () => {
     if (!address) return;
     setLoading(true);
     setError(null);
 
     try {
-      // 1. Prepare address list
-      let addressesToScan: `0x${string}`[] = [...KNOWN_TOKENS.map(t => t.address)];
+      console.log(`[useTokenBalances] Orchestrating scan for ${address}`);
+      const results = await scanTokens(address);
       
-      if (customAddresses && customAddresses.length > 0) {
-        addressesToScan = [...new Set([...addressesToScan, ...customAddresses as `0x${string}`[]])];
-      } else if (baseAddresses.length > 0) {
-        addressesToScan = [...new Set([...addressesToScan, ...baseAddresses as `0x${string}`[]])];
-      }
-
-      console.log(`[useTokenBalances] Scanning ${addressesToScan.length} unique addresses...`);
-
-      // 2. Scan
-      const results = await scanTokens(address, addressesToScan);
-      console.log(`[useTokenBalances] Scan returned ${results.length} tokens with balance.`);
-
-      // 3. Map to UI Model
       const mapped: TokenBalance[] = results.map(t => ({
         ...t,
         balanceFormatted: Number(t.balance) / Math.pow(10, t.decimals),
@@ -47,41 +32,38 @@ export function useTokenBalances() {
         canSell: !UNSELLABLE.has(t.address.toLowerCase()),
       }));
 
-      // Sort: by USD value descending
-      mapped.sort((a, b) => b.usdValue - a.usdValue);
+      // Sort: by USD value descending, then by PRICED status
+      mapped.sort((a, b) => {
+        if (a.status === "PRICED" && b.status !== "PRICED") return -1;
+        if (a.status !== "PRICED" && b.status === "PRICED") return 1;
+        return b.usdValue - a.usdValue;
+      });
 
+      console.log(`[useTokenBalances] Scan complete. Total tokens with balance: ${mapped.length}`);
       setTokens(mapped);
     } catch (e) {
-      console.error("[useTokenBalances] Fetch Balances Error:", e);
+      console.error("[useTokenBalances] Scan Orchestration Error:", e);
       setError(e instanceof Error ? e.message : "Failed to fetch balances");
     } finally {
       setLoading(false);
     }
-  }, [address, baseAddresses]);
+  }, [address]);
 
-  // Initial List Fetch
   useEffect(() => {
-    if (isConnected && !hasFetchedList.current) {
-      hasFetchedList.current = true;
-      fetchBaseTokenList().then(list => {
-        if (list.length > 0) {
-          setBaseAddresses(list);
-        }
-      });
-    }
-  }, [isConnected]);
-
-  // Initial Balance Fetch
-  useEffect(() => {
-    if (address) {
+    if (isConnected && address) {
       fetchBalances();
     }
-  }, [address, fetchBalances]);
+  }, [isConnected, address, fetchBalances]);
 
-  const totalUSDValue = tokens.reduce((s, t) => s + t.usdValue, 0);
+  // Wallet Total = sum of PRICED tokens
+  const totalUSDValue = tokens
+    .filter(t => t.status === "PRICED")
+    .reduce((s, t) => s + t.usdValue, 0);
+
   const dustTokens = tokens.filter(
-    (t) => t.usdValue < 1 && t.usdValue > 0 && t.canSell
+    (t) => t.status === "PRICED" && t.usdValue < 1 && t.usdValue > 0 && t.canSell
   );
+
   const unpricedTokens = tokens.filter(
     (t) => t.status !== "PRICED" && t.balance > 0n && t.canSell
   );
