@@ -40,37 +40,63 @@ export async function discoverAddressList(account: string): Promise<string[]> {
     console.warn("[Discovery] Official list fetch failed, skipping...");
   }
 
-  // 3. ERC20 Transfer Log Scan (Discovery of historic activity)
-  // We scan the last 20,000 blocks to find tokens recently moved
+  // 3. Blockscout Base API (Complete Historical Token Balances)
+  // This replaces the 20,000 block log scan, providing all tokens ever owned by the wallet
+  let nextPagePath: string | null = `/api/v2/addresses/${account}/token-balances`;
   try {
-    const currentBlock = await provider.getBlockNumber();
-    const fromBlock = currentBlock - 20000; 
+    while (nextPagePath) {
+      const url: string = `https://base.blockscout.com${nextPagePath}`;
+      const res: Response = await fetch(url);
+      if (!res.ok) break;
 
-    // Filter: Transfer(address from, address to, uint256 value)
-    const transferTopic = ethers.id("Transfer(address,address,uint256)");
-    const walletTopic = ethers.zeroPadValue(account, 32);
+      const data: any = await res.json();
+      if (Array.isArray(data.items)) {
+        data.items.forEach((item: any) => {
+          if (item?.token?.address) {
+            addresses.add(item.token.address.toLowerCase());
+          }
+        });
+      }
 
-    // Logs where wallet is the recipient
-    const toLogs = await provider.getLogs({
-      fromBlock,
-      toBlock: 'latest',
-      topics: [transferTopic, null, walletTopic]
-    });
-
-    // Logs where wallet is the sender
-    const fromLogs = await provider.getLogs({
-      fromBlock,
-      toBlock: 'latest',
-      topics: [transferTopic, walletTopic, null]
-    });
-
-    [...toLogs, ...fromLogs].forEach(log => {
-      addresses.add(log.address.toLowerCase());
-    });
-
-    console.log(`[Discovery] Found ${toLogs.length + fromLogs.length} historic transfer logs.`);
+      nextPagePath = data.next_page_params 
+        ? `/api/v2/addresses/${account}/token-balances?` + new URLSearchParams(data.next_page_params).toString()
+        : null;
+    }
+    console.log(`[Discovery] Complete Blockscout scan finished.`);
   } catch (e) {
-    console.warn("[Discovery] Log scanning failed (ignoring):", e);
+    console.warn("[Discovery] Blockscout API failed (ignoring):", e);
+  }
+
+  // 4. (Fallback) ERC20 Transfer Log Scan if Blockscout is down
+  // We scan the last 10,000 blocks to find tokens recently moved as a last resort
+  if (addresses.size < popularBase.length + 50) {
+    try {
+      const currentBlock = await provider.getBlockNumber();
+      const fromBlock = currentBlock - 10000; 
+
+      const transferTopic = ethers.id("Transfer(address,address,uint256)");
+      const walletTopic = ethers.zeroPadValue(account, 32);
+
+      const toLogs = await provider.getLogs({
+        fromBlock,
+        toBlock: 'latest',
+        topics: [transferTopic, null, walletTopic]
+      });
+
+      const fromLogs = await provider.getLogs({
+        fromBlock,
+        toBlock: 'latest',
+        topics: [transferTopic, walletTopic, null]
+      });
+
+      [...toLogs, ...fromLogs].forEach(log => {
+        addresses.add(log.address.toLowerCase());
+      });
+
+      console.log(`[Discovery] Found ${toLogs.length + fromLogs.length} recent transfer logs via RPC fallback.`);
+    } catch (e) {
+      console.warn("[Discovery] RPC Fallback Log scanning failed:", e);
+    }
   }
 
   const finalResult = Array.from(addresses);
