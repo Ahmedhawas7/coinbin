@@ -1,307 +1,93 @@
-// src/hooks/useSweep.ts — CoinBin State Machine
-//
-// مراحل التنفيذ:
-//   idle → classifying → approving → selling → burning → success | error
+// src/hooks/useSweep.ts
+import { useState, useCallback, useMemo } from "react";
+import { useAccount } from "wagmi";
+import { ethers } from "ethers";
+import { CleanerEngine } from "@/lib/cleaner";
+import { type ScannedToken } from "@/lib/scanner";
+import { type BatchProgress } from "@/lib/batchSell";
+import { type SwapInstance } from "@/lib/swap";
 
-import { useState, useCallback } from "react";
-import { usePublicClient, useWalletClient, useAccount, useCapabilities } from "wagmi";
-import { useWriteContracts } from "wagmi/experimental";
-import {
-  classifyTokens,
-  checkApprovals,
-  approveToken,
-  executeSell,
-  executeBurn,
-  formatUSDC,
-  type TokenToProcess,
-  type SweepResult,
-} from "@/lib/sweep";
-import { BURN_ADDRESS, ERC20_ABI } from "@/config/contracts";
-import type { Address } from "viem";
-import { useMemo } from "react";
-
-export type SweepStatus =
-  | "idle"
-  | "classifying"
-  | "approving"
-  | "selling"
-  | "burning"
-  | "success"
-  | "error";
+export type SweepStatus = "idle" | "scanning" | "preparing" | "cleaning" | "success" | "error";
 
 export interface SweepState {
   status: SweepStatus;
   currentStep: string;
-  sweepResult: SweepResult | null;
-  sellCount: number;
-  burnCount: number;
-  approvalsNeeded: number;
-  approvalsComplete: number;
-  sellTxHash?: string;
-  burnTxHashes?: `0x${string}`[];
+  scannedTokens: ScannedToken[];
+  swaps: SwapInstance[];
+  progress: BatchProgress | null;
   error?: string;
-  formattedUserReceives: string;
-  formattedProtocolFee: string;
-  protocolFeeUSD: number;
-  isBatchingSupported: boolean;
-  isPaymasterSupported: boolean;
 }
 
 const INITIAL: SweepState = {
   status: "idle",
   currentStep: "",
-  sweepResult: null,
-  sellCount: 0,
-  burnCount: 0,
-  approvalsNeeded: 0,
-  approvalsComplete: 0,
-  formattedUserReceives: "$0.00",
-  formattedProtocolFee: "$0.0000",
-  protocolFeeUSD: 0,
-  isBatchingSupported: false,
-  isPaymasterSupported: false,
+  scannedTokens: [],
+  swaps: [],
+  progress: null,
 };
 
 export function useSweep() {
-  const { address, chainId } = useAccount();
-  const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
+  const { address } = useAccount();
   const [state, setState] = useState<SweepState>(INITIAL);
-
-  // ─── Smart Wallet Capabilities ───────────────────────────────────────────
-  const { data: capabilities } = useCapabilities({ account: address });
-  const { writeContractsAsync } = useWriteContracts();
-
-  const isBatchingSupported = useMemo(() => {
-    if (!capabilities || !chainId) return false;
-    return !!capabilities[chainId]?.atomicBatch?.supported;
-  }, [capabilities, chainId]);
-
-  const paymasterUrl = useMemo(() => {
-    const key = process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY;
-    if (!key) return undefined;
-    return `https://api.developer.coinbase.com/rpc/v1/base/${key}`;
-  }, []);
 
   const patch = (p: Partial<SweepState>) =>
     setState((prev) => ({ ...prev, ...p }));
 
-  // ─── Step 1: Classify (sell vs burn) ─────────────────────────────────────
-  const classify = useCallback(
-    async (tokens: TokenToProcess[], slippageBps: number, referrer?: Address) => {
-      if (!publicClient || !address) return null;
+  const scan = useCallback(async (tokenAddresses: string[]) => {
+    if (!address) return;
+    patch({ status: "scanning", currentStep: "Scanning on-chain liquidity..." });
+    try {
+      const engine = new CleanerEngine({ account: address as string, tokenAddresses });
+      const results = await engine.scan();
+      patch({ status: "idle", scannedTokens: results, currentStep: "" });
+      return results;
+    } catch (e: any) {
+      patch({ status: "error", error: e.message });
+      return [];
+    }
+  }, [address]);
 
-      patch({ status: "classifying", currentStep: "🔍 Scanning 0x + Aerodrome + Uniswap..." });
+  const startCleaning = useCallback(async (tokens: ScannedToken[], slippage?: number) => {
+    if (!address || typeof window === "undefined" || !(window as any).ethereum) return;
+    
+    patch({ status: "preparing", currentStep: "Preparing swap routes..." });
+    
+    try {
+      const engine = new CleanerEngine({ 
+        account: address as string, 
+        tokenAddresses: tokens.map(t => t.address),
+        slippage 
+      });
+      
+      const swaps = await engine.prepareSwaps(tokens);
+      patch({ status: "cleaning", swaps, currentStep: "Executing batch..." });
 
-      try {
-        const result = await classifyTokens(publicClient, tokens, slippageBps, address, referrer);
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
 
-        patch({
-          status: "idle",
-          sweepResult: result,
-          sellCount: result.sellQuotes.length,
-          burnCount: result.burnQuotes.length,
-          formattedUserReceives: formatUSDC(result.totalAfterFee),
-          formattedProtocolFee: `$${result.totalProtocolFeeUSD.toFixed(4)}`,
-          protocolFeeUSD: result.totalProtocolFeeUSD,
-          currentStep: "",
-        });
+      await engine.clean(signer, swaps, (progress) => {
+        patch({ progress, currentStep: progress.status });
+      });
 
-        return result;
-      } catch (e) {
-        patch({
-          status: "error",
-          error: e instanceof Error ? e.message : "فشل تحليل التوكنات",
-          currentStep: "",
-        });
-        return null;
-      }
-    },
-    [publicClient, address]
-  );
-
-  // ─── Step 2: Execute sell + burn ─────────────────────────────────────────
-  const execute = useCallback(
-    async (result: SweepResult, slippageBps: number) => {
-      if (!publicClient || !walletClient || !address) {
-        patch({ status: "error", error: "المحفظة غير متصلة" });
-        return;
-      }
-
-      try {
-        // ── 1) Smart Wallet Batch Execution ───────────────────────────────
-        if (isBatchingSupported) {
-          patch({ status: "selling", currentStep: "🚀 تنفيذ المعاملة المجمعة (Batching)..." });
-          
-          const contracts: any[] = [];
-
-          // Collect approvals
-          const tokensForApproval = result.sellQuotes.map((q) => ({
-            address: q.token.address,
-            balance: q.token.balance,
-            spender: q.tx?.to,
-          }));
-          const needApproval = await checkApprovals(publicClient, address, tokensForApproval);
-          
-          for (const a of needApproval) {
-            contracts.push({
-              address: a.tokenAddress,
-              abi: ERC20_ABI,
-              functionName: "approve",
-              args: [a.spender, BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")],
-            });
-          }
-
-          // Collect sells
-          for (const q of result.sellQuotes) {
-            if (!q.tx) continue;
-            // Note: 0x data is raw hex, so we use it directly as if calling 'to'
-            // In a batch, we can pass raw data if the interface supports it, 
-            // but usually we specify functionName/args.
-            // However, 0x transactions are arbitrary.
-            // For Smart Wallets, we can use 'value: q.tx.value', 'data: q.tx.data', 'to: q.tx.to'
-            // We use a helper format for useWriteContracts.
-            contracts.push({
-              address: q.tx.to,
-              abi: [], // Raw call
-              functionName: "fallback", // Some providers allow this for raw data
-              data: q.tx.data,
-              value: q.tx.value,
-            });
-          }
-
-          // Collect burns
-          for (const q of result.burnQuotes) {
-            contracts.push({
-              address: q.token.address,
-              abi: ERC20_ABI,
-              functionName: "transfer",
-              args: [BURN_ADDRESS, q.amountIn],
-            });
-          }
-
-          if (contracts.length === 0) return;
-
-          // Execute Batch
-          const bundleId = await writeContractsAsync({
-            contracts: contracts.map(c => ({
-              address: c.address,
-              abi: c.abi,
-              functionName: c.functionName === "fallback" ? undefined : c.functionName,
-              args: c.args,
-              data: c.data,
-              value: c.value,
-            })),
-            capabilities: {
-              paymasterService: paymasterUrl ? { url: paymasterUrl } : undefined,
-              atomicBatch: { supported: true },
-            },
-          });
-
-          patch({ status: "success", sellTxHash: (bundleId as any)?.id || bundleId, currentStep: "✅ اكتمل!" });
-          return;
-        }
-
-        // ── 2) Standard EOA Sequential Execution ────────────────────────────
-        // (Existing Logic)
-        if (result.sellQuotes.length > 0) {
-          patch({ status: "approving", currentStep: "التحقق من الصلاحيات..." });
-
-          const tokensForApproval = result.sellQuotes.map((q) => ({
-            address: q.token.address,
-            balance: q.token.balance,
-            spender: q.tx?.to,
-          }));
-
-          const needApproval = await checkApprovals(
-            publicClient,
-            address,
-            tokensForApproval
-          );
-
-          patch({ approvalsNeeded: needApproval.length, approvalsComplete: 0 });
-
-          for (let i = 0; i < needApproval.length; i++) {
-            const { tokenAddress, spender } = needApproval[i];
-            const sym =
-              result.sellQuotes.find(
-                (q) => q.token.address.toLowerCase() === tokenAddress.toLowerCase()
-              )?.token.symbol ?? "...";
-
-            patch({ currentStep: `موافقة على ${sym} (${i + 1}/${needApproval.length})` });
-
-            const tx = await approveToken(walletClient, tokenAddress, spender, address);
-            await publicClient.waitForTransactionReceipt({ hash: tx });
-            patch({ approvalsComplete: i + 1 });
-          }
-        }
-
-        // ── b) Sell ───────────────────────────────────────────────────────
-        let sellTxHash: `0x${string}` | undefined;
-        if (result.sellQuotes.length > 0) {
-          for (let i = 0; i < result.sellQuotes.length; i++) {
-            const quote = result.sellQuotes[i];
-            patch({
-              status: "selling",
-              currentStep: `💰 بيع ${quote.token.symbol} (${i + 1}/${result.sellQuotes.length})...`,
-            });
-
-            sellTxHash = await executeSell(
-              walletClient,
-              publicClient,
-              quote,
-              address
-            );
-
-            await publicClient.waitForTransactionReceipt({ hash: sellTxHash });
-          }
-        }
-
-        // ── c) Burn ───────────────────────────────────────────────────────
-        let burnHashes: `0x${string}`[] = [];
-        if (result.burnQuotes.length > 0) {
-          patch({
-            status: "burning",
-            currentStep: `🔥 حرق ${result.burnQuotes.length} رمز ميت...`,
-          });
-
-          burnHashes = await executeBurn(walletClient, result.burnQuotes, address);
-          if (burnHashes.length > 0) {
-            await publicClient.waitForTransactionReceipt({
-              hash: burnHashes[burnHashes.length - 1],
-            });
-          }
-        }
-
-        patch({
-          status: "success",
-          sellTxHash,
-          burnTxHashes: burnHashes,
-          currentStep: "✅ اكتمل!",
-        });
-      } catch (e: unknown) {
-        const msg =
-          e instanceof Error
-            ? e.message.includes("User rejected") || e.message.includes("denied")
-              ? "تم إلغاء المعاملة من المحفظة"
-              : e.message
-            : "حدث خطأ غير متوقع";
-        patch({ status: "error", error: msg, currentStep: "" });
-      }
-    },
-    [publicClient, walletClient, address, isBatchingSupported, writeContractsAsync, paymasterUrl]
-  );
+      patch({ status: "success", currentStep: "Cleaning Complete!" });
+    } catch (e: any) {
+      console.error("Cleaning Error:", e);
+      patch({ status: "error", error: e.message || "Batch execution failed" });
+    }
+  }, [address]);
 
   const reset = useCallback(() => setState(INITIAL), []);
 
-  return { 
-    state: { 
-      ...state, 
-      isBatchingSupported, 
-      isPaymasterSupported: !!paymasterUrl 
-    }, 
-    classify, 
-    execute, 
-    reset 
+  const totalValue = useMemo(() => {
+    return state.scannedTokens.reduce((acc, t) => acc + t.usdValue, 0);
+  }, [state.scannedTokens]);
+
+  return {
+    state,
+    scan,
+    startCleaning,
+    reset,
+    totalValue,
   };
 }
+

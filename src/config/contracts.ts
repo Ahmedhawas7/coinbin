@@ -27,6 +27,9 @@ export const MIN_SWAP_VALUE_USDC = BigInt(1); // $0.000001
 export const UNISWAP_V3_ROUTER = "0x2626664c2603336E57B271c5C0b26F421741e481" as const;
 export const UNISWAP_V3_QUOTER = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a" as const;
 export const AERODROME_ROUTER  = "0x9401518c4cc1ee5021bc4b2a3333f2402bd099c1" as const;
+export const UNISWAP_V2_ROUTER = "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24" as const;
+export const BASESWAP_ROUTER   = "0x327Df1E6de55d39693ef2dB97316A734D7A13B6B" as const;
+
 
 // ─── Key Token Addresses on Base ─────────────────────────────────────────────
 export const TOKENS = {
